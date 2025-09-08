@@ -5,3 +5,7 @@ build/
 build-*/
 docgen_tmp/
 .zbscanhelper.zig
+
+# IDE
+.idea/
+.vscode/
