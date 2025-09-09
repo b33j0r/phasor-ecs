@@ -7,6 +7,7 @@ pub const Schedule = @import("Schedule.zig");
 pub const ScheduleManager = @import("ScheduleManager.zig");
 pub const System = @import("System.zig");
 pub const World = @import("World.zig");
+pub const DefaultRunner = @import("DefaultRunner.zig");
 
 const systems_mod = @import("systems.zig");
 pub const Res = systems_mod.Res;
