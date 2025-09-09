@@ -1,5 +1,6 @@
 allocator: std.mem.Allocator,
 systems: std.ArrayListUnmanaged(System) = .empty,
+label: []const u8 = "",
 
 const std = @import("std");
 const root = @import("root.zig");
@@ -15,10 +16,22 @@ pub fn init(allocator: std.mem.Allocator) Schedule {
     return Schedule{
         .allocator = allocator,
         .systems = .empty,
+        .label = "",
+    };
+}
+
+pub fn initLabel(allocator: std.mem.Allocator, label: []const u8) Schedule {
+    // duplicate label to own memory; freed in deinit
+    const owned = allocator.dupe(u8, label) catch @panic("Out of memory duplicating schedule label");
+    return Schedule{
+        .allocator = allocator,
+        .systems = .empty,
+        .label = owned,
     };
 }
 
 pub fn deinit(self: *Schedule) void {
+    if (self.label.len != 0) self.allocator.free(self.label);
     self.systems.deinit(self.allocator);
 }
 

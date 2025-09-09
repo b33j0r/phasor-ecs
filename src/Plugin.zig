@@ -38,9 +38,9 @@ pub fn from(allocator: std.mem.Allocator, plugin_ptr: anytype) Plugin {
     const PtrT = @TypeOf(plugin_ptr);
     const info = @typeInfo(PtrT);
     comptime {
-        if (info != .Pointer) @compileError("Plugin.from expects a pointer to a plugin instance");
+        if (info != .pointer) @compileError("Plugin.from expects a pointer to a plugin instance");
     }
-    const T = info.Pointer.child;
+    const T = info.pointer.child;
 
     const name_val: []const u8 = if (@hasDecl(T, "name"))
         T.name
@@ -52,17 +52,37 @@ pub fn from(allocator: std.mem.Allocator, plugin_ptr: anytype) Plugin {
     else
         true;
 
+    // Make wrappers for the vtable functions that provide a self pointer of type T
+    const wrappers = struct {
+        const SelfPtr = *anyopaque;
+
+        fn build(self_ptr: SelfPtr, app: *App) Error!void {
+            return (@as(*T, self_ptr)).build(app);
+        }
+        fn ready(self_ptr: SelfPtr, app: *const App) bool {
+            return (@as(*const T, self_ptr)).ready(app);
+        }
+        fn finish(self_ptr: SelfPtr, app: *App) void {
+            (@as(*T, self_ptr)).finish(app);
+        }
+        fn cleanup(self_ptr: SelfPtr, app: *App) void {
+            (@as(*T, self_ptr)).cleanup(app);
+        }
+    };
+
+    const vtable = VTable{
+        .build = if (@hasDecl(T, "build")) &wrappers.build else null,
+        .ready = if (@hasDecl(T, "ready")) &wrappers.ready else null,
+        .finish = if (@hasDecl(T, "finish")) &wrappers.finish else null,
+        .cleanup = if (@hasDecl(T, "cleanup")) &wrappers.cleanup else null,
+        .destroy = if (is_unique_val) &destroyNoop else &wrappers.cleanup,
+    };
+
     return Plugin{
         .name = name_val,
         .is_unique = is_unique_val,
-        .self_ptr = @as(*anyopaque, @ptrCast(plugin_ptr)),
-        .vtable = .{
-            .build = null,
-            .ready = null,
-            .finish = null,
-            .cleanup = null,
-            .destroy = destroyNoop,
-        },
+        .self_ptr = @as(*anyopaque, @constCast(plugin_ptr)),
+        .vtable = vtable,
         .allocator = allocator,
     };
 }

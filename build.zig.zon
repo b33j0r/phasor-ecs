@@ -33,8 +33,8 @@
     // internet connectivity.
     .dependencies = .{
         .phasor_graph = .{
-            .url = "git+https://github.com/b33j0r/phasor-graph#91f4e8f239b3438d832ff92d7387b179a7cf19b7",
-            .hash = "phasor_graph-0.0.0-9nmJXKkpAQAopDVfTeZ7dUbNSa61VP2N8ljavPocnvP7",
+            .url = "git+https://github.com/b33j0r/phasor-graph#5e2e398b2db9a682b532483426a75b55d0f59e0c",
+            .hash = "phasor_graph-0.0.0-9nmJXLspAQCrVWshzsn3Bgbtq6G4TTTZM79yHSthNo6X",
         },
         .phasor_db = .{
             .url = "git+https://github.com/b33j0r/phasor-db#284317add730ac6bec9a484bd28e3273dd36e590",

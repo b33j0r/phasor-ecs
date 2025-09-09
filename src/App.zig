@@ -1,26 +1,41 @@
+allocator: std.mem.Allocator,
+plugins: std.ArrayListUnmanaged(Plugin) = .empty,
+schedules: ScheduleManager,
+db: Database,
+is_running: bool = false,
+
 const std = @import("std");
 const root = @import("root.zig");
 const Plugin = root.Plugin;
+const ScheduleManager = root.ScheduleManager;
+const Schedule = root.Schedule;
+const Database = root.db.Database;
 
 const App = @This();
 
-pub const RunnerFn = *const fn (app: *const App) Error!void;
-
 pub const Error = error{
     PluginAlreadyAdded,
-    NoRunnerFunction,
-    RunnerFailed,
 };
 
-allocator: std.mem.Allocator,
-plugins: std.ArrayListUnmanaged(Plugin) = .empty,
-runner_fn: ?RunnerFn,
+/// `default` adds the default schedules and plugins to the app.
+pub fn default(allocator: std.mem.Allocator) !App {
+    var app = App.init(allocator);
+
+    // Add default schedules
+    _ = try app.addSchedule("Update");
+
+    // Add default plugins
+    try app.addPlugin(&root.FramePlugin{});
+
+    return app;
+}
 
 pub fn init(allocator: std.mem.Allocator) App {
     return App{
         .allocator = allocator,
         .plugins = .empty,
-        .runner_fn = null,
+        .schedules = ScheduleManager.init(allocator),
+        .db = Database.init(allocator),
     };
 }
 
@@ -31,10 +46,10 @@ pub fn deinit(self: *App) void {
         plugin.deinit();
     }
     self.plugins.deinit(self.allocator);
-}
 
-pub fn setRunner(self: *App, runnerFn: RunnerFn) void {
-    self.runner_fn = runnerFn;
+    // Deinitialize schedules and database
+    self.schedules.deinit();
+    self.db.deinit();
 }
 
 /// Adds a plugin to the app, enforcing uniqueness if required,
@@ -55,16 +70,45 @@ pub fn addPlugin(self: *App, plugin_ptr: anytype) !void {
     try self.plugins.items[self.plugins.items.len - 1].build(self);
 }
 
-/// Runs the app with the configured runner, then calls
-/// `finish()` on all plugins once the runner completes.
+/// Add or get a schedule by name
+pub fn addSchedule(self: *App, name: []const u8) !*Schedule {
+    return try self.schedules.addSchedule(name);
+}
+
+/// Add a system function to a schedule by name
+pub fn addSystem(self: *App, schedule_name: []const u8, comptime system_fn: anytype) !void {
+    try self.schedules.addSystem(schedule_name, system_fn);
+}
+
+/// Constrain schedule execution order: name must run before other
+pub fn scheduleBefore(self: *App, name: []const u8, other: []const u8) !void {
+    try self.schedules.scheduleBefore(name, other);
+}
+
+/// Constrain schedule execution order: name must run after other
+pub fn scheduleAfter(self: *App, name: []const u8, other: []const u8) !void {
+    try self.schedules.scheduleAfter(name, other);
+}
+
+/// Calls step repeatedly in a loop.
 pub fn run(self: *App) !void {
-    if (self.runner_fn) |runner| {
-        try runner(self);
-    } else {
-        return Error.NoRunnerFunction;
+    self.is_running = true;
+    while (self.is_running) {
+        try self.step();
+    }
+    self.is_running = false;
+}
+
+/// Advances the app by one tick/frame.
+pub fn step(self: *App) !void {
+    var tx = self.db.transaction();
+
+    var schedule_iter = try self.schedules.iterator();
+    defer schedule_iter.deinit();
+    while (true) {
+        const schedule = schedule_iter.next() orelse break;
+        try schedule.run(&tx);
     }
 
-    for (self.plugins.items) |plugin| {
-        plugin.finish(self);
-    }
+    try tx.execute();
 }
