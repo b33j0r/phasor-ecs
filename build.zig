@@ -12,7 +12,7 @@ pub fn build(b: *std.Build) void {
     const phasor_graph_dep = b.dependency("phasor_graph", .{});
     const phasor_graph_mod = phasor_graph_dep.module("phasor-graph");
 
-    const phasor_ecs_mod = b.addModule("phasor_ecs", .{
+    const phasor_ecs_mod = b.addModule("phasor-ecs", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
