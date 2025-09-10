@@ -52,7 +52,7 @@ pub fn addSchedule(self: *ScheduleManager, name: []const u8) !*Schedule {
         return &self.schedules.items[idx];
     }
     // create schedule and add to list
-    const schedule = Schedule.initLabel(self.allocator, name);
+    const schedule = try Schedule.initWithLabel(self.allocator, name);
     try self.schedules.append(self.allocator, schedule);
     const idx_u32: u32 = @intCast(self.schedules.items.len - 1);
     const node = try self.graph.addNode(idx_u32);

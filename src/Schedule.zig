@@ -20,9 +20,9 @@ pub fn init(allocator: std.mem.Allocator) Schedule {
     };
 }
 
-pub fn initLabel(allocator: std.mem.Allocator, label: []const u8) Schedule {
+pub fn initWithLabel(allocator: std.mem.Allocator, label: []const u8) !Schedule {
     // duplicate label to own memory; freed in deinit
-    const owned = allocator.dupe(u8, label) catch @panic("Out of memory duplicating schedule label");
+    const owned = try allocator.dupe(u8, label);
     return Schedule{
         .allocator = allocator,
         .systems = .empty,

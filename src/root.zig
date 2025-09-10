@@ -3,6 +3,7 @@ pub const graph = @import("phasor-graph");
 
 pub const App = @import("App.zig");
 pub const Plugin = @import("Plugin.zig");
+pub const ResourceManager = @import("ResourceManager.zig");
 pub const Schedule = @import("Schedule.zig");
 pub const ScheduleManager = @import("ScheduleManager.zig");
 pub const System = @import("System.zig");
