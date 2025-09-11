@@ -8,7 +8,7 @@ const System = root.System;
 
 const phasor_db = @import("phasor-db");
 const Database = phasor_db.Database;
-const Transaction = phasor_db.Transaction;
+const Commands = root.Commands;
 
 const Schedule = @This();
 
@@ -40,8 +40,8 @@ pub fn add(self: *Schedule, comptime system_fn: anytype) !void {
     try self.systems.append(self.allocator, system);
 }
 
-pub fn run(self: *const Schedule, tx: *Transaction) !void {
+pub fn run(self: *const Schedule, commands: *Commands) !void {
     for (self.systems.items) |system| {
-        try system.run(tx);
+        try system.run(commands);
     }
 }

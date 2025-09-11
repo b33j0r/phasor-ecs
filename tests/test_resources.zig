@@ -2,7 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 const root = @import("phasor-ecs");
 const ResourceManager = root.ResourceManager;
-const Database = root.db.Database;
+const World = root.World;
 const resourceId = ResourceManager.resourceId;
 
 // Test resource types
@@ -262,27 +262,27 @@ test "resourceId function consistency" {
     try testing.expect(id1 != window_id);
 }
 
-test "ResourceManager integration with Database" {
-    var db = Database.init(testing.allocator);
-    defer db.deinit();
+test "ResourceManager integration with World" {
+    var world = World.init(testing.allocator);
+    defer world.deinit();
 
-    // Test Database resource methods
+    // Test World resource methods
     const config = GameConfig{
         .max_players = 8,
         .level_count = 20,
         .title = "Integration Test",
     };
 
-    try db.insertResource(config);
-    try testing.expect(db.hasResource(GameConfig));
+    try world.insertResource(config);
+    try testing.expect(world.getResource(GameConfig) != null);
 
-    const retrieved = db.getResource(GameConfig).?;
+    const retrieved = world.getResource(GameConfig).?;
     try testing.expectEqual(@as(u32, 8), retrieved.max_players);
     try testing.expectEqualStrings("Integration Test", retrieved.title);
 
-    const removed = db.removeResource(GameConfig);
+    const removed = world.removeResource(GameConfig);
     try testing.expect(removed);
-    try testing.expect(!db.hasResource(GameConfig));
+    try testing.expect(world.getResource(GameConfig) == null);
 }
 
 test "ResourceManager memory cleanup on replace" {
@@ -321,27 +321,27 @@ const ResourcePlayerStats = struct {
 
 test "Resource management memory leak" {
     const allocator = testing.allocator;
-    var db = Database.init(allocator);
-    defer db.deinit();
+    var world = World.init(allocator);
+    defer world.deinit();
 
     const num_cycles = 100;
 
     for (0..num_cycles) |cycle| {
         // Insert resources
-        try db.insertResource(GameState{ .score = @intCast(cycle * 100), .level = @intCast(cycle % 10 + 1), .time_remaining = 60.0 });
+        try world.insertResource(GameState{ .score = @intCast(cycle * 100), .level = @intCast(cycle % 10 + 1), .time_remaining = 60.0 });
 
-        try db.insertResource(ResourcePlayerStats{ .experience = cycle * 1000, .gold = @intCast(cycle * 50), .inventory = [_]u32{0} ** 16 });
+        try world.insertResource(ResourcePlayerStats{ .experience = cycle * 1000, .gold = @intCast(cycle * 50), .inventory = [_]u32{0} ** 16 });
 
         // Access resources
-        const game_state = db.getResource(GameState);
+        const game_state = world.getResource(GameState);
         try testing.expect(game_state != null);
         try testing.expectEqual(@as(u32, @intCast(cycle * 100)), game_state.?.score);
 
         // Remove resources
-        _ = db.removeResource(GameState);
-        _ = db.removeResource(ResourcePlayerStats);
+        _ = world.removeResource(GameState);
+        _ = world.removeResource(ResourcePlayerStats);
 
-        try testing.expect(!db.hasResource(GameState));
-        try testing.expect(!db.hasResource(ResourcePlayerStats));
+        try testing.expect(world.getResource(GameState) == null);
+        try testing.expect(world.getResource(ResourcePlayerStats) == null);
     }
 }

@@ -1,7 +1,7 @@
 allocator: std.mem.Allocator,
 plugins: std.ArrayListUnmanaged(Plugin) = .empty,
 schedules: ScheduleManager,
-db: Database,
+world: World,
 is_running: bool = false,
 
 const std = @import("std");
@@ -9,7 +9,7 @@ const root = @import("root.zig");
 const Plugin = root.Plugin;
 const ScheduleManager = root.ScheduleManager;
 const Schedule = root.Schedule;
-const Database = root.db.Database;
+const World = root.World;
 
 const App = @This();
 
@@ -35,7 +35,7 @@ pub fn init(allocator: std.mem.Allocator) App {
         .allocator = allocator,
         .plugins = .empty,
         .schedules = ScheduleManager.init(allocator),
-        .db = Database.init(allocator),
+        .world = World.init(allocator),
     };
 }
 
@@ -49,7 +49,7 @@ pub fn deinit(self: *App) void {
 
     // Deinitialize schedules and database
     self.schedules.deinit();
-    self.db.deinit();
+    self.world.deinit();
 }
 
 /// Adds a plugin to the app, enforcing uniqueness if required,
@@ -101,14 +101,19 @@ pub fn run(self: *App) !void {
 
 /// Advances the app by one tick/frame.
 pub fn step(self: *App) !void {
-    var tx = self.db.transaction();
+    var commands = self.world.commands();
 
     var schedule_iter = try self.schedules.iterator();
     defer schedule_iter.deinit();
     while (true) {
         const schedule = schedule_iter.next() orelse break;
-        try schedule.run(&tx);
+        try schedule.run(&commands);
     }
 
-    try tx.execute();
+    try commands.apply();
+}
+
+/// Adds a resource to the world.
+pub fn insertResource(self: *App, resource: anytype) !void {
+    try self.world.insertResource(resource);
 }

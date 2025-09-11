@@ -3,7 +3,8 @@ const phasor_db = @import("phasor-db");
 const Entity = phasor_db.Entity;
 const GroupByResult = phasor_db.GroupByResult;
 const QueryResult = phasor_db.QueryResult;
-const Transaction = phasor_db.Transaction;
+const ecs = @import("root.zig");
+const Commands = ecs.Commands;
 
 // System Parameters
 //
@@ -19,8 +20,8 @@ pub fn Res(comptime ResourceT: type) type {
         const Self = @This();
         pub const T = ResourceT;
 
-        pub fn init_system_param(self: *Self, tx: *Transaction) !void {
-            self.ptr = tx.getResource(ResourceT).?;
+        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+            self.ptr = commands.world.getResourceMut(ResourceT).?;
         }
     };
 }
@@ -36,9 +37,9 @@ pub fn Query(comptime Parts: anytype) type {
 
         const Self = @This();
 
-        /// Initializes this system parameter by executing the query on the transaction.
-        pub fn init_system_param(self: *Self, tx: *Transaction) !void {
-            self.result = try tx.query(Parts);
+        /// Initializes this system parameter by executing the query on the world via commands.
+        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+            self.result = try commands.world.entities.query(Parts);
         }
 
         /// Free resources held by the underlying QueryResult.
@@ -89,9 +90,8 @@ pub fn GroupBy(comptime TraitT: anytype) type {
         const Self = @This();
 
         /// Initializes this system parameter by grouping the entire DB by TraitT.
-        pub fn init_system_param(self: *Self, tx: *Transaction) !void {
-            // There is no Transaction facade for Trait grouping across DB; use database directly.
-            self.result = try tx.database.groupBy(TraitT);
+        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+            self.result = try commands.world.entities.groupBy(TraitT);
         }
 
         /// Free resources held by the underlying GroupByResult.

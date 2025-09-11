@@ -1,16 +1,14 @@
-run: *const fn (transaction: *Transaction) anyerror!void,
+run: *const fn (commands: *Commands) anyerror!void,
 
 const std = @import("std");
 
 const root = @import("root.zig");
 const System = root.System;
-
-const phasor_db = @import("phasor-db");
-const Transaction = phasor_db.Transaction;
+const Commands = root.Commands;
 
 pub fn from(comptime system_fn: anytype) !System {
     // Validate that system_fn is a function
-        const fn_type = @TypeOf(system_fn);
+    const fn_type = @TypeOf(system_fn);
     const type_info = @typeInfo(fn_type);
     if (type_info != .@"fn") {
         return error.InvalidSystemFunction;
@@ -21,23 +19,23 @@ pub fn from(comptime system_fn: anytype) !System {
     }
 
     const runFn = &struct {
-        pub fn run(transaction: *Transaction) !void {
+        pub fn run(commands: *Commands) !void {
             // Make an arg tuple type for the system function
-                const ArgsTupleType = std.meta.ArgsTuple(@TypeOf(system_fn));
+            const ArgsTupleType = std.meta.ArgsTuple(@TypeOf(system_fn));
             var args_tuple: ArgsTupleType = undefined;
 
             // Fill in the args tuple based on parameter types
-                inline for (std.meta.fields(ArgsTupleType), 0..) |field, i| {
+            inline for (std.meta.fields(ArgsTupleType), 0..) |field, i| {
                 const ParamType = field.type;
 
                 // Check if this is a Transaction parameter
-                    if (ParamType == *Transaction) {
+                if (ParamType == *Commands) {
                     // Get transaction from database
-                        args_tuple[i] = transaction;
+                    args_tuple[i] = commands;
                 } else if (@hasDecl(ParamType, "init_system_param")) {
                     // It's a system parameter (e.g., Res(T))
-                        var param_instance: ParamType = undefined;
-                    try param_instance.init_system_param(transaction);
+                    var param_instance: ParamType = undefined;
+                    try param_instance.init_system_param(commands);
                     args_tuple[i] = param_instance;
                 } else {
                     @compileError("Unsupported system parameter type: " ++ @typeName(ParamType));
@@ -45,7 +43,7 @@ pub fn from(comptime system_fn: anytype) !System {
             }
 
             // Call the original system function with the prepared arguments
-                return @call(.auto, system_fn, args_tuple);
+            return @call(.auto, system_fn, args_tuple);
         }
     }.run;
 

@@ -13,7 +13,7 @@ test "App.addSystem adds to existing schedule and runs in order" {
     var app = try App.default(allocator);
     defer app.deinit();
 
-    try app.db.insertResource(Recorder{});
+    try app.insertResource(Recorder{});
 
     const s1 = struct {
         pub fn run(rec: Res(Recorder)) !void {
@@ -31,13 +31,13 @@ test "App.addSystem adds to existing schedule and runs in order" {
 
     try app.step();
 
-    const rec = app.db.getResource(Recorder).?;
+    const rec = app.world.getResource(Recorder).?;
     try std.testing.expectEqual(@as(usize, 2), rec.log.items.len);
     try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "A"));
     try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "B"));
 
     // cleanup Recorder resource allocations
-    var rec_mut = rec;
+    var rec_mut = app.world.getResourceMut(Recorder).?;
     rec_mut.log.deinit(allocator);
 }
 
@@ -55,7 +55,7 @@ test "Schedules can be added and ordered with before/after" {
     var app = try App.default(allocator);
     defer app.deinit();
 
-    try app.db.insertResource(Recorder{});
+    try app.insertResource(Recorder{});
 
     // Add another schedule
     _ = try app.addSchedule("Render");
@@ -68,13 +68,13 @@ test "Schedules can be added and ordered with before/after" {
 
     try app.step();
 
-    const rec = app.db.getResource(Recorder).?;
+    const rec = app.world.getResource(Recorder).?;
     try std.testing.expectEqual(@as(usize, 2), rec.log.items.len);
 
     try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "U"));
     try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "R"));
 
-    var rec_mut = rec;
+    var rec_mut = app.world.getResourceMut(Recorder).?;
     rec_mut.log.deinit(allocator);
 }
 
@@ -84,7 +84,7 @@ test "Schedule after and before constraints around Update" {
     var app = try App.default(allocator);
     defer app.deinit();
 
-    try app.db.insertResource(Recorder{});
+    try app.insertResource(Recorder{});
 
     _ = try app.addSchedule("Render");
     _ = try app.addSchedule("AfterUpdate");
@@ -99,12 +99,12 @@ test "Schedule after and before constraints around Update" {
 
     try app.step();
 
-    const rec = app.db.getResource(Recorder).?;
+    const rec = app.world.getResource(Recorder).?;
     try std.testing.expectEqual(@as(usize, 3), rec.log.items.len);
     try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "U"));
     try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "A"));
     try std.testing.expect(std.mem.eql(u8, rec.log.items[2], "R"));
 
-    var rec_mut = rec;
+    var rec_mut = app.world.getResourceMut(Recorder).?;
     rec_mut.log.deinit(allocator);
 }

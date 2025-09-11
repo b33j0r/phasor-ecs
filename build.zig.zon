@@ -37,8 +37,8 @@
             .hash = "phasor_graph-0.0.0-9nmJXLspAQCrVWshzsn3Bgbtq6G4TTTZM79yHSthNo6X",
         },
         .phasor_db = .{
-            .url = "git+https://github.com/b33j0r/phasor-db#284317add730ac6bec9a484bd28e3273dd36e590",
-            .hash = "phasor_db-0.2.0-bJGmGCu0AgBNjacamriWsva6aGUBwnpxSiAWYkImw4zp",
+            .url = "git+https://github.com/b33j0r/phasor-db#91cf61a32fc3209291f4b755e47c9c7483dcb4e2",
+            .hash = "phasor_db-0.2.0-bJGmGEeBAgDwdKtPuwcfmM-v-Dnr5PMaoFPT6IJf4Rsf",
         },
     },
     .paths = .{

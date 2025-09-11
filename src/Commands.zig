@@ -1,0 +1,53 @@
+//! Queues commands to be run on the Database.
+command_buffer: CommandBuffer,
+world: *World,
+
+const std = @import("std");
+
+const root = @import("root.zig");
+const CommandBuffer = root.CommandBuffer;
+const World = root.World;
+const Entity = root.Entity;
+
+const Commands = @This();
+
+pub fn init(allocator: std.mem.Allocator, world: *World) Commands {
+    return Commands{
+        .command_buffer = CommandBuffer.init(allocator),
+        .world = world,
+    };
+}
+
+pub fn deinit(self: *Commands) void {
+    self.command_buffer.deinit();
+}
+
+pub fn apply(self: *Commands) !void {
+    // Flush the queued commands into the provided world
+    try self.command_buffer.flush(self.world);
+}
+
+fn reserveEntityId(self: *Commands) Entity.Id {
+    return self.world.entities.reserveEntityId();
+}
+
+pub fn createEntity(self: *Commands, components: anytype) !Entity.Id {
+    const entity_id = self.reserveEntityId();
+
+    const CreateEntityContext = struct {
+        entity_id: Entity.Id,
+        components: @TypeOf(components),
+
+        pub fn execute(ctx: *@This(), world: *World) anyerror!void {
+            _ = try world.entities.createEntityWithId(ctx.entity_id, ctx.components);
+        }
+        // No cleanup needed; Command will destroy context allocation
+    };
+
+    try self.command_buffer.queueContext(CreateEntityContext{
+        .entity_id = entity_id,
+        .components = components,
+    });
+
+    return entity_id;
+}
