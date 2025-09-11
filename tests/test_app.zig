@@ -8,7 +8,7 @@ const Recorder = struct {
     log: std.ArrayListUnmanaged([]const u8) = .empty,
 };
 
-/// Utility: append a marker string into the recorder.
+/// Creates a system that appends a marker string to the recorder.
 fn appendMark(comptime name: []const u8) fn (Res(Recorder)) anyerror!void {
     return struct {
         pub fn run(rec: Res(Recorder)) !void {
@@ -106,4 +106,51 @@ test "between frames schedule runs every tick" {
     try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "between"));
 
     cleanupRecorder(&app);
+}
+
+test "App plugins can be registered" {
+    const allocator = std.testing.allocator;
+
+    const MyPlugin = struct {
+        build_called: bool = false,
+        ready_called: bool = false,
+        finish_called: bool = false,
+        cleanup_called: bool = false,
+
+        pub const Self = @This();
+        pub fn build(self: *Self, _: *App) anyerror!void {
+            self.build_called = true;
+        }
+        pub fn cleanup(self: *Self, _: *App) void {
+            self.cleanup_called = true;
+        }
+    };
+
+    var my_plugin = MyPlugin{};
+
+    var app = try App.default(allocator);
+    try app.addPlugin(&my_plugin);
+    app.deinit();
+
+    try std.testing.expect(my_plugin.build_called);
+    try std.testing.expect(my_plugin.cleanup_called);
+}
+
+test "App plugins can be added as inline structs" {
+    const allocator = std.testing.allocator;
+
+    const BuildCalled = struct {};
+
+    const MyPlugin = struct {
+        pub const Self = @This();
+        pub fn build(_: *Self, app: *App) anyerror!void {
+            try app.insertResource(BuildCalled{});
+        }
+    };
+
+    var app = try App.default(allocator);
+    try app.addPlugin(MyPlugin{});
+    defer app.deinit();
+
+    try std.testing.expect(app.world.hasResource(BuildCalled));
 }

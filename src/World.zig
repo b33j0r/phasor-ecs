@@ -35,6 +35,10 @@ pub fn removeResource(self: *World, comptime T: type) bool {
     return self.resources.remove(T);
 }
 
+pub fn hasResource(self: *World, comptime T: type) bool {
+    return self.resources.get(T) != null;
+}
+
 pub fn getResource(self: *World, comptime T: type) ?*T {
     return self.resources.get(T);
 }

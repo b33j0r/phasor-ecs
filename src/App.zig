@@ -67,13 +67,12 @@ pub fn deinit(self: *App) void {
 
 /// Adds a plugin to the app, enforcing uniqueness if required,
 /// and immediately calls its `build` function.
-pub fn addPlugin(self: *App, plugin_ptr: anytype) !void {
-    const plugin = Plugin.from(self.allocator, plugin_ptr);
+pub fn addPlugin(self: *App, plugin_or_ptr: anytype) !void {
+    const plugin = try Plugin.from(self.allocator, plugin_or_ptr);
 
     if (plugin.is_unique) {
         for (self.plugins.items) |existing_plugin| {
             if (std.mem.eql(u8, existing_plugin.name, plugin.name)) {
-                // no instance to destroy; return error
                 return Error.PluginAlreadyAdded;
             }
         }

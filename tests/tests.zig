@@ -3,9 +3,11 @@ pub const test_app = @import("test_app.zig");
 pub const test_resources = @import("test_resources.zig");
 pub const test_commands = @import("test_commands.zig");
 
-const std = @import("std");
 const Self = @This();
 
 test "Import tests" {
-    std.testing.refAllDecls(Self);
+    _ = Self.test_schedules;
+    _ = Self.test_app;
+    _ = Self.test_resources;
+    _ = Self.test_commands;
 }

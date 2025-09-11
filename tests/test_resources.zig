@@ -345,3 +345,15 @@ test "Resource management memory leak" {
         try testing.expect(world.getResource(ResourcePlayerStats) == null);
     }
 }
+
+test "insertResource with ZST" {
+    var world = World.init(testing.allocator);
+    defer world.deinit();
+
+    try world.insertResource(GameMarker{});
+    try testing.expect(world.hasResource(GameMarker));
+
+    const removed = world.removeResource(GameMarker);
+    try testing.expect(removed);
+    try testing.expect(!world.hasResource(GameMarker));
+}
