@@ -101,8 +101,9 @@ pub const ScheduleIterator = struct {
     }
 };
 
-pub fn iterator(self: *ScheduleManager) !ScheduleIterator {
-    var result = try self.graph.topologicalSort(self.allocator);
+pub fn iterator(self: *ScheduleManager, startNode: []const u8) !ScheduleIterator {
+    const start = self.name_to_node.get(startNode) orelse return Error.ScheduleNotFound;
+    var result = try self.graph.topologicalSortFrom(self.allocator, start);
     if (result.has_cycles) {
         result.deinit();
         return Error.CyclicDependency;

@@ -3,6 +3,7 @@ plugins: std.ArrayListUnmanaged(Plugin) = .empty,
 schedules: ScheduleManager,
 world: World,
 is_running: bool = false,
+step_start_schedule_name: []const u8 = "BeginFrame",
 
 const std = @import("std");
 const root = @import("root.zig");
@@ -22,7 +23,19 @@ pub fn default(allocator: std.mem.Allocator) !App {
     var app = App.init(allocator);
 
     // Add default schedules
+    _ = try app.addSchedule("Startup");
+    _ = try app.addSchedule("Shutdown");
+
+    _ = try app.addSchedule("BetweenFrames");
+
+    _ = try app.addSchedule("BeginFrame");
     _ = try app.addSchedule("Update");
+    _ = try app.addSchedule("Render");
+    _ = try app.addSchedule("EndFrame");
+
+    _ = try app.scheduleAfter("Update", "BeginFrame");
+    _ = try app.scheduleBefore("Render", "EndFrame");
+    _ = try app.scheduleAfter("Render", "Update");
 
     // Add default plugins
     try app.addPlugin(&root.FramePlugin{});
@@ -90,27 +103,33 @@ pub fn scheduleAfter(self: *App, name: []const u8, other: []const u8) !void {
     try self.schedules.scheduleAfter(name, other);
 }
 
-/// Calls step repeatedly in a loop.
-pub fn run(self: *App) !void {
-    self.is_running = true;
-    while (self.is_running) {
-        try self.step();
-    }
-    self.is_running = false;
-}
-
-/// Advances the app by one tick/frame.
-pub fn step(self: *App) !void {
+pub fn runSchedulesFrom(self: *App, start: []const u8) !void {
     var commands = self.world.commands();
 
-    var schedule_iter = try self.schedules.iterator();
+    var schedule_iter = try self.schedules.iterator(start);
     defer schedule_iter.deinit();
-    while (true) {
-        const schedule = schedule_iter.next() orelse break;
+    while (schedule_iter.next()) |schedule| {
         try schedule.run(&commands);
     }
 
     try commands.apply();
+}
+
+/// Advances the app by one tick/frame.
+pub fn step(self: *App) !void {
+    try self.runSchedulesFrom(self.step_start_schedule_name);
+}
+
+/// Calls step repeatedly in a loop.
+pub fn run(self: *App) !void {
+    self.is_running = true;
+    try self.runSchedulesFrom("Startup");
+    while (self.is_running) {
+        try self.step();
+        try self.runSchedulesFrom("BetweenFrames");
+    }
+    try self.runSchedulesFrom("Shutdown");
+    self.is_running = false;
 }
 
 /// Adds a resource to the world.

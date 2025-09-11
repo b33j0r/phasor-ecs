@@ -3,44 +3,12 @@ const ecs = @import("phasor-ecs");
 const App = ecs.App;
 const Res = ecs.Res;
 
+/// A simple recorder resource that logs events in order.
 const Recorder = struct {
     log: std.ArrayListUnmanaged([]const u8) = .empty,
 };
 
-test "App.addSystem adds to existing schedule and runs in order" {
-    const allocator = std.testing.allocator;
-
-    var app = try App.default(allocator);
-    defer app.deinit();
-
-    try app.insertResource(Recorder{});
-
-    const s1 = struct {
-        pub fn run(rec: Res(Recorder)) !void {
-            try rec.ptr.log.append(std.testing.allocator, "A");
-        }
-    }.run;
-    const s2 = struct {
-        pub fn run(rec: Res(Recorder)) !void {
-            try rec.ptr.log.append(std.testing.allocator, "B");
-        }
-    }.run;
-
-    try app.addSystem("Update", s1);
-    try app.addSystem("Update", s2);
-
-    try app.step();
-
-    const rec = app.world.getResource(Recorder).?;
-    try std.testing.expectEqual(@as(usize, 2), rec.log.items.len);
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "A"));
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "B"));
-
-    // cleanup Recorder resource allocations
-    var rec_mut = app.world.getResourceMut(Recorder).?;
-    rec_mut.log.deinit(allocator);
-}
-
+/// Utility: append a marker string into the recorder.
 fn appendMark(comptime name: []const u8) fn (Res(Recorder)) anyerror!void {
     return struct {
         pub fn run(rec: Res(Recorder)) !void {
@@ -49,62 +17,93 @@ fn appendMark(comptime name: []const u8) fn (Res(Recorder)) anyerror!void {
     }.run;
 }
 
-test "Schedules can be added and ordered with before/after" {
-    const allocator = std.testing.allocator;
-
-    var app = try App.default(allocator);
-    defer app.deinit();
-
-    try app.insertResource(Recorder{});
-
-    // Add another schedule
-    _ = try app.addSchedule("Render");
-
-    // Constrain order: Update -> Render
-    try app.scheduleBefore("Update", "Render");
-
-    try app.addSystem("Update", appendMark("U"));
-    try app.addSystem("Render", appendMark("R"));
-
-    try app.step();
-
-    const rec = app.world.getResource(Recorder).?;
-    try std.testing.expectEqual(@as(usize, 2), rec.log.items.len);
-
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "U"));
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "R"));
-
+/// Utility: cleanup the recorder’s allocated log.
+fn cleanupRecorder(app: *App) void {
     var rec_mut = app.world.getResourceMut(Recorder).?;
-    rec_mut.log.deinit(allocator);
+    rec_mut.log.deinit(app.allocator);
 }
 
-test "Schedule after and before constraints around Update" {
+test "default schedules execute in expected game order" {
     const allocator = std.testing.allocator;
-
     var app = try App.default(allocator);
     defer app.deinit();
 
     try app.insertResource(Recorder{});
 
-    _ = try app.addSchedule("Render");
-    _ = try app.addSchedule("AfterUpdate");
+    // Add systems into the default frame loop
+    try app.addSystem("Startup", appendMark("startup"));
+    try app.addSystem("BeginFrame", appendMark("begin"));
+    try app.addSystem("Update", appendMark("update"));
+    try app.addSystem("Render", appendMark("render"));
+    try app.addSystem("EndFrame", appendMark("end"));
+    try app.addSystem("Shutdown", appendMark("shutdown"));
 
-    // Update -> AfterUpdate -> Render
-    try app.scheduleAfter("AfterUpdate", "Update");
-    try app.scheduleBefore("AfterUpdate", "Render");
+    // Run one frame only
+    try app.runSchedulesFrom("Startup");
+    try app.step(); // runs BeginFrame -> Update -> Render -> EndFrame
+    try app.runSchedulesFrom("Shutdown");
 
-    try app.addSystem("Update", appendMark("U"));
-    try app.addSystem("AfterUpdate", appendMark("A"));
-    try app.addSystem("Render", appendMark("R"));
+    const rec = app.world.getResource(Recorder).?;
+    try std.testing.expectEqual(@as(usize, 6), rec.log.items.len);
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "startup"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "begin"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[2], "update"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[3], "render"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[4], "end"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[5], "shutdown"));
+
+    cleanupRecorder(&app);
+}
+
+test "custom game schedule fits between default ones" {
+    const allocator = std.testing.allocator;
+    var app = try App.default(allocator);
+    defer app.deinit();
+
+    try app.insertResource(Recorder{});
+
+    // Add a custom schedule (e.g. physics)
+    _ = try app.addSchedule("Physics");
+
+    // Ensure it runs after Update but before Render
+    try app.scheduleAfter("Physics", "Update");
+    try app.scheduleBefore("Physics", "Render");
+
+    try app.addSystem("Update", appendMark("update"));
+    try app.addSystem("Physics", appendMark("physics"));
+    try app.addSystem("Render", appendMark("render"));
 
     try app.step();
 
     const rec = app.world.getResource(Recorder).?;
     try std.testing.expectEqual(@as(usize, 3), rec.log.items.len);
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "U"));
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "A"));
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[2], "R"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "update"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "physics"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[2], "render"));
 
-    var rec_mut = app.world.getResourceMut(Recorder).?;
-    rec_mut.log.deinit(allocator);
+    cleanupRecorder(&app);
+}
+
+test "between frames schedule runs every tick" {
+    const allocator = std.testing.allocator;
+    var app = try App.default(allocator);
+    defer app.deinit();
+
+    try app.insertResource(Recorder{});
+
+    try app.addSystem("BetweenFrames", appendMark("between"));
+
+    // Run two ticks
+    try app.step();
+    try app.runSchedulesFrom("BetweenFrames");
+    try app.step();
+    try app.runSchedulesFrom("BetweenFrames");
+
+    const rec = app.world.getResource(Recorder).?;
+    // We only added to BetweenFrames, so we should see two entries.
+    try std.testing.expectEqual(@as(usize, 2), rec.log.items.len);
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "between"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "between"));
+
+    cleanupRecorder(&app);
 }
