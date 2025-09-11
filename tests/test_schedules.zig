@@ -17,7 +17,7 @@ const Health = struct {
 
 const Player = struct {};
 
-test "System with no params is an error" {
+test "System with no params" {
     const system_with_no_params_fn = struct {
         pub fn system_with_no_params() !void {}
     }.system_with_no_params;
@@ -27,11 +27,7 @@ test "System with no params is an error" {
     var schedule = Schedule.init(allocator);
     defer schedule.deinit();
 
-    schedule.add(system_with_no_params_fn) catch {
-        // expect to fail because system has no parameters
-        return;
-    };
-    try std.testing.expect(false);
+    try schedule.add(system_with_no_params_fn);
 }
 
 test "System with transaction system param" {

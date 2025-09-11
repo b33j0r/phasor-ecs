@@ -14,10 +14,6 @@ pub fn from(comptime system_fn: anytype) !System {
         return error.InvalidSystemFunction;
     }
 
-    if (type_info.@"fn".params.len == 0) {
-        return error.SystemMustHaveParameters;
-    }
-
     const runFn = &struct {
         pub fn run(commands: *Commands) !void {
             // Make an arg tuple type for the system function
