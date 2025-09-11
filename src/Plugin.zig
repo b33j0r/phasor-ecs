@@ -66,13 +66,13 @@ fn make(plugin_ptr: anytype, allocator: std.mem.Allocator, owned: bool) Plugin {
 
     const wrappers = struct {
         fn build(ptr: *anyopaque, app: *App) anyerror!void {
-            return (@as(*T, @ptrCast(ptr))).build(app);
+            return (@as(*T, @ptrCast(@alignCast(ptr)))).build(app);
         }
         fn cleanup(ptr: *anyopaque, app: *App) void {
-            return (@as(*T, @ptrCast(ptr))).cleanup(app);
+            return (@as(*T, @ptrCast(@alignCast(ptr)))).cleanup(app);
         }
         fn destroyOwned(allocator_: std.mem.Allocator, ptr: *anyopaque) void {
-            allocator_.destroy(@as(*T, @ptrCast(ptr)));
+            allocator_.destroy(@as(*T, @ptrCast(@alignCast(ptr))));
         }
         fn destroyNoop(_: std.mem.Allocator, _: *anyopaque) void {}
     };
