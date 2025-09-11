@@ -1,7 +1,4 @@
 pub const db = @import("phasor-db");
-pub const Database = db.Database;
-pub const Entity = db.Entity;
-
 pub const graph = @import("phasor-graph");
 
 pub const App = @import("App.zig");

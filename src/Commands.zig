@@ -7,7 +7,7 @@ const std = @import("std");
 const root = @import("root.zig");
 const CommandBuffer = root.CommandBuffer;
 const World = root.World;
-const Entity = root.Entity;
+const Entity = root.db.Entity;
 
 const Commands = @This();
 
