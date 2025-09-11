@@ -51,3 +51,7 @@ pub fn createEntity(self: *Commands, components: anytype) !Entity.Id {
 
     return entity_id;
 }
+
+pub fn insertResource(self: *Commands, resource_ptr: anytype) !void {
+    try self.world.insertResource(resource_ptr);
+}

@@ -4,6 +4,8 @@ pub const Entity = db.Entity;
 pub const graph = @import("phasor-graph");
 
 pub const App = @import("App.zig");
+pub const Exit = App.Exit;
+
 pub const CommandBuffer = @import("CommandBuffer.zig");
 pub const Command = @import("Command.zig");
 pub const Commands = @import("Commands.zig");

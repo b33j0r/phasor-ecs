@@ -154,3 +154,20 @@ test "App plugins can be added as inline structs" {
 
     try std.testing.expect(app.world.hasResource(BuildCalled));
 }
+
+test "App respects Exit resource" {
+    // Run an app with a system that adds the Exit resource
+    const allocator = std.testing.allocator;
+    var app = try App.default(allocator);
+    defer app.deinit();
+
+    const exit_system = struct {
+        pub fn run(commands: *ecs.Commands) !void {
+            _ = try commands.insertResource(App.Exit{ .code = 42 });
+        }
+    }.run;
+
+    try app.addSystem("Update", exit_system);
+    const exit_code = try app.run();
+    try std.testing.expectEqual(exit_code, 42);
+}

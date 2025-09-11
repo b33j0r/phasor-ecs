@@ -2,7 +2,6 @@ allocator: std.mem.Allocator,
 plugins: std.ArrayListUnmanaged(Plugin) = .empty,
 schedules: ScheduleManager,
 world: World,
-is_running: bool = false,
 step_start_schedule_name: []const u8 = "BeginFrame",
 
 const std = @import("std");
@@ -16,6 +15,10 @@ const App = @This();
 
 pub const Error = error{
     PluginAlreadyAdded,
+};
+
+pub const Exit = struct {
+    code: u8,
 };
 
 /// `default` adds the default schedules and plugins to the app.
@@ -120,15 +123,19 @@ pub fn step(self: *App) !void {
 }
 
 /// Calls step repeatedly in a loop.
-pub fn run(self: *App) !void {
-    self.is_running = true;
+pub fn run(self: *App) !u8 {
     try self.runSchedulesFrom("Startup");
-    while (self.is_running) {
+    while (true) {
         try self.step();
+        if (self.world.hasResource(Exit)) {
+            break;
+        }
         try self.runSchedulesFrom("BetweenFrames");
     }
     try self.runSchedulesFrom("Shutdown");
-    self.is_running = false;
+
+    const exit_res = self.world.getResource(Exit).?;
+    return exit_res.code;
 }
 
 /// Adds a resource to the world.
