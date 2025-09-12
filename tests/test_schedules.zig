@@ -3,6 +3,8 @@ const std = @import("std");
 const root = @import("phasor-ecs");
 const Query = root.Query;
 const Res = root.Res;
+const ResMut = root.ResMut;
+const ResOpt = root.ResOpt;
 const Schedule = root.Schedule;
 const System = root.System;
 const Without = root.Without;
@@ -56,36 +58,6 @@ test "System with transaction system param" {
     var query_result = try world.entities.query(.{Player});
     defer query_result.deinit();
     try std.testing.expect(query_result.count() == 1);
-}
-
-test "System with Res(T) param" {
-    // Use Health as a resource for this test
-    const system_with_res_param_fn = struct {
-        pub fn system_with_res_param(res: Res(Health)) !void {
-            // Modify the resource
-            res.ptr.current += 10;
-        }
-    }.system_with_res_param;
-
-    const allocator = std.testing.allocator;
-    var world = World.init(allocator);
-    defer world.deinit();
-
-    try world.insertResource(Health{ .current = 93, .max = 100 });
-
-    var schedule = Schedule.init(allocator);
-    defer schedule.deinit();
-
-    var commands = world.commands();
-    defer commands.deinit();
-
-    try schedule.add(system_with_res_param_fn);
-    try schedule.run(&commands);
-
-    // No entity changes queued; no need to apply commands
-
-    const health_res = world.getResource(Health) orelse unreachable;
-    try std.testing.expect(health_res.current == 103);
 }
 
 test "System with Query(.{T}) param" {
@@ -188,7 +160,7 @@ test "System with combination of params" {
     const system_with_combined_params_fn = struct {
         pub fn system_with_combined_params(
             commands: *Commands,
-            res: Res(Health),
+            res: ResMut(Health),
             q: Query(.{Player}),
         ) !void {
             // Should see exactly one Player entity
@@ -224,4 +196,83 @@ test "System with combination of params" {
     var query_result = try world.entities.query(.{Player});
     defer query_result.deinit();
     try std.testing.expect(query_result.count() == 2);
+}
+
+test "System with Res(T) param" {
+    // Use Health as a resource for this test
+    const system_with_res_param_fn = struct {
+        pub fn system_with_res_param(res: Res(Health)) !void {
+            // Check the resource value
+            try std.testing.expectEqual(@as(i32, 80), res.ptr.current);
+        }
+    }.system_with_res_param;
+
+    const allocator = std.testing.allocator;
+    var world = World.init(allocator);
+    defer world.deinit();
+
+    try world.insertResource(Health{ .current = 80, .max = 100 });
+
+    var schedule = Schedule.init(allocator);
+    defer schedule.deinit();
+
+    var commands = world.commands();
+    defer commands.deinit();
+
+    try schedule.add(system_with_res_param_fn);
+    try schedule.run(&commands);
+}
+
+test "System with ResMut(T) param" {
+    // Use Health as a resource for this test
+    const system_with_res_param_fn = struct {
+        pub fn system_with_res_param(res: ResMut(Health)) !void {
+            // Modify the resource
+            res.ptr.current += 10;
+        }
+    }.system_with_res_param;
+
+    const allocator = std.testing.allocator;
+    var world = World.init(allocator);
+    defer world.deinit();
+
+    try world.insertResource(Health{ .current = 93, .max = 100 });
+
+    var schedule = Schedule.init(allocator);
+    defer schedule.deinit();
+
+    var commands = world.commands();
+    defer commands.deinit();
+
+    try schedule.add(system_with_res_param_fn);
+    try schedule.run(&commands);
+
+    // No entity changes queued; no need to apply commands
+
+    const health_res = world.getResource(Health) orelse unreachable;
+    try std.testing.expect(health_res.current == 103);
+}
+
+test "System with ResOpt(T) param" {
+    const allocator = std.testing.allocator;
+    var world = World.init(allocator);
+    defer world.deinit();
+
+    // No Health resource inserted yet
+
+    const system_with_resopt_param_fn = struct {
+        pub fn system_with_resopt_param(res_opt: ResOpt(Health)) !void {
+            // Resource is absent; ptr should be null
+            try std.testing.expect(res_opt.ptr == null);
+        }
+    }.system_with_resopt_param;
+
+    var schedule = Schedule.init(allocator);
+    defer schedule.deinit();
+
+    var commands = world.commands();
+    defer commands.deinit();
+
+    try schedule.add(system_with_resopt_param_fn);
+    try schedule.run(&commands);
 }

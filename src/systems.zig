@@ -15,6 +15,21 @@ const Commands = ecs.Commands;
 /// a resource of type `T` as a system parameter.
 pub fn Res(comptime ResourceT: type) type {
     return struct {
+        ptr: *const T,
+
+        const Self = @This();
+        pub const T = ResourceT;
+
+        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+            self.ptr = commands.world.getResourceMut(ResourceT).?;
+        }
+    };
+}
+
+/// `ResMut(T)` is a comptime wrapper to specify
+/// a resource of type `T` as a system parameter.
+pub fn ResMut(comptime ResourceT: type) type {
+    return struct {
         ptr: *T,
 
         const Self = @This();
@@ -22,6 +37,20 @@ pub fn Res(comptime ResourceT: type) type {
 
         pub fn init_system_param(self: *Self, commands: *Commands) !void {
             self.ptr = commands.world.getResourceMut(ResourceT).?;
+        }
+    };
+}
+
+/// `ResOpt(T)` is a comptime wrapper to specify
+/// an optional resource of type `T` as a system parameter.
+pub fn ResOpt(comptime ResourceT: type) type {
+    return struct {
+        ptr: ?*const T,
+        const Self = @This();
+        pub const T = ResourceT;
+
+        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+            self.ptr = commands.world.getResourceMut(ResourceT);
         }
     };
 }

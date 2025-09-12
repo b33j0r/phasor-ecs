@@ -2,6 +2,8 @@ const std = @import("std");
 const ecs = @import("phasor-ecs");
 const App = ecs.App;
 const Res = ecs.Res;
+const ResMut = ecs.ResMut;
+const ResOpt = ecs.ResOpt;
 
 /// A simple recorder resource that logs events in order.
 const Recorder = struct {
@@ -9,9 +11,9 @@ const Recorder = struct {
 };
 
 /// Creates a system that appends a marker string to the recorder.
-fn appendMark(comptime name: []const u8) fn (Res(Recorder)) anyerror!void {
+fn appendMark(comptime name: []const u8) fn (ResMut(Recorder)) anyerror!void {
     return struct {
-        pub fn run(rec: Res(Recorder)) !void {
+        pub fn run(rec: ResMut(Recorder)) !void {
             try rec.ptr.log.append(std.testing.allocator, name);
         }
     }.run;
