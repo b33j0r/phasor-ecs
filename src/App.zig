@@ -40,9 +40,6 @@ pub fn default(allocator: std.mem.Allocator) !App {
     _ = try app.scheduleBefore("Render", "EndFrame");
     _ = try app.scheduleAfter("Render", "Update");
 
-    // Add default plugins
-    try app.addPlugin(&root.FramePlugin{});
-
     return app;
 }
 
@@ -88,6 +85,10 @@ pub fn addPlugin(self: *App, plugin_or_ptr: anytype) !void {
 /// Add or get a schedule by name
 pub fn addSchedule(self: *App, name: []const u8) !*Schedule {
     return try self.schedules.addSchedule(name);
+}
+
+pub fn removeSchedule(self: *App, name: []const u8) !void {
+    return self.schedules.removeSchedule(name);
 }
 
 /// Add a system function to a schedule by name

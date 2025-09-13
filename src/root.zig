@@ -24,8 +24,9 @@ pub const Query = systems_mod.Query;
 pub const Without = systems_mod.Without;
 pub const GroupBy = systems_mod.GroupBy;
 
-const plugins_mod = @import("plugins/mod.zig");
-pub const FramePlugin = plugins_mod.FramePlugin;
+const phases_mod = @import("phases.zig");
+pub const PhasesPlugin = phases_mod.PhasesPlugin;
+pub const PhaseContext = phases_mod.PhaseContext;
 
 comptime {
     // Ensure that the dependencies are seen by the semantic analyzer
@@ -41,5 +42,5 @@ comptime {
     _ = System;
     _ = World;
     _ = systems_mod;
-    _ = plugins_mod;
+    _ = phases_mod;
 }

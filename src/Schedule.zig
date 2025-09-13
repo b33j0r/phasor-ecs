@@ -30,8 +30,12 @@ pub fn initWithLabel(allocator: std.mem.Allocator, label: []const u8) !Schedule 
 }
 
 pub fn deinit(self: *Schedule) void {
-    if (self.label.len != 0) self.allocator.free(self.label);
+    if (self.label.len != 0) {
+        self.allocator.free(self.label);
+        self.label = "";
+    }
     self.systems.deinit(self.allocator);
+    self.systems = .empty;
 }
 
 pub fn add(self: *Schedule, comptime system_fn: anytype) !void {

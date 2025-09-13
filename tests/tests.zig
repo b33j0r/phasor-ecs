@@ -2,6 +2,7 @@ pub const test_schedules = @import("test_schedules.zig");
 pub const test_app = @import("test_app.zig");
 pub const test_resources = @import("test_resources.zig");
 pub const test_commands = @import("test_commands.zig");
+pub const test_phases = @import("test_phases.zig");
 
 const Self = @This();
 
@@ -10,4 +11,5 @@ test "Import tests" {
     _ = Self.test_app;
     _ = Self.test_resources;
     _ = Self.test_commands;
+    _ = Self.test_phases;
 }
