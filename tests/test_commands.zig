@@ -76,7 +76,7 @@ test "CommandBuffer queues and flushes in order" {
 }
 
 // Test that Commands can reserve IDs and create entities via queued commands
-test "Commands.reserveEntityId and createEntity" {
+test "Commands createEntity" {
     const allocator = std.testing.allocator;
     var world = ecs.World.init(allocator);
     defer world.deinit();
@@ -96,4 +96,25 @@ test "Commands.reserveEntityId and createEntity" {
 
     try std.testing.expect(e1.get(Foo).?.x == 1);
     try std.testing.expect(e2.get(Foo).?.x == 2);
+}
+
+test "Commands removeEntity" {
+    const allocator = std.testing.allocator;
+    var world = ecs.World.init(allocator);
+    defer world.deinit();
+
+    const id1 = try world.entities.createEntity(.{Foo{ .x = 1 }});
+    const id2 = try world.entities.createEntity(.{Foo{ .x = 2 }});
+
+    try std.testing.expect(world.entities.getEntityCount() == 2);
+
+    var cmds = Commands.init(allocator, &world);
+    defer cmds.deinit();
+
+    try cmds.removeEntity(id1);
+    try cmds.removeEntity(id2);
+
+    try std.testing.expect(world.entities.getEntityCount() == 2);
+    try cmds.apply();
+    try std.testing.expect(world.entities.getEntityCount() == 0);
 }

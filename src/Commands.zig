@@ -41,7 +41,6 @@ pub fn createEntity(self: *Commands, components: anytype) !Entity.Id {
         pub fn execute(ctx: *@This(), world: *World) anyerror!void {
             _ = try world.entities.createEntityWithId(ctx.entity_id, ctx.components);
         }
-        // No cleanup needed; Command will destroy context allocation
     };
 
     try self.command_buffer.queueContext(CreateEntityContext{
@@ -52,6 +51,32 @@ pub fn createEntity(self: *Commands, components: anytype) !Entity.Id {
     return entity_id;
 }
 
+pub fn removeEntity(self: *Commands, entity_id: Entity.Id) !void {
+    const RemoveEntityContext = struct {
+        entity_id: Entity.Id,
+
+        pub fn execute(ctx: *@This(), world: *World) anyerror!void {
+            _ = try world.entities.removeEntity(ctx.entity_id);
+        }
+    };
+
+    try self.command_buffer.queueContext(RemoveEntityContext{
+        .entity_id = entity_id,
+    });
+}
+
 pub fn insertResource(self: *Commands, resource_ptr: anytype) !void {
     try self.world.insertResource(resource_ptr);
+}
+
+pub fn removeResource(self: *Commands, comptime T: type) bool {
+    return self.world.removeResource(T);
+}
+
+pub fn getResource(self: *Commands, comptime T: type) ?*T {
+    return self.world.getResource(T);
+}
+
+pub fn hasResource(self: *Commands, comptime T: type) bool {
+    return self.world.hasResource(T);
 }
