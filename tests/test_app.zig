@@ -173,3 +173,34 @@ test "App respects Exit resource" {
     const exit_code = try app.run();
     try std.testing.expectEqual(exit_code, 42);
 }
+
+test "App removed schedules are actually removed" {
+    const allocator = std.testing.allocator;
+    var app = try App.default(allocator);
+    defer app.deinit();
+
+    try app.insertResource(Recorder{});
+
+    // Add a custom schedule (e.g. physics)
+    _ = try app.addSchedule("Physics");
+
+    // Ensure it runs after Update but before Render
+    try app.scheduleAfter("Physics", "Update");
+    try app.scheduleBefore("Physics", "Render");
+
+    try app.addSystem("Update", appendMark("update"));
+    try app.addSystem("Physics", appendMark("physics"));
+    try app.addSystem("Render", appendMark("render"));
+
+    // Remove the custom schedule before running
+    try app.removeSchedule("Physics");
+
+    try app.step();
+
+    const rec = app.world.getResource(Recorder).?;
+    try std.testing.expectEqual(@as(usize, 2), rec.log.items.len);
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "update"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "render"));
+
+    cleanupRecorder(&app);
+}
