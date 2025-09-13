@@ -33,26 +33,30 @@ test "default schedules execute in expected game order" {
     try app.insertResource(Recorder{});
 
     // Add systems into the default frame loop
+    try app.addSystem("PreStartup", appendMark("prestartup"));
     try app.addSystem("Startup", appendMark("startup"));
     try app.addSystem("BeginFrame", appendMark("begin"));
     try app.addSystem("Update", appendMark("update"));
     try app.addSystem("Render", appendMark("render"));
     try app.addSystem("EndFrame", appendMark("end"));
+    try app.addSystem("PreShutdown", appendMark("preshutdown"));
     try app.addSystem("Shutdown", appendMark("shutdown"));
 
     // Run one frame only
-    try app.runSchedulesFrom("Startup");
+    try app.runSchedulesFrom("PreStartup");
     try app.step(); // runs BeginFrame -> Update -> Render -> EndFrame
-    try app.runSchedulesFrom("Shutdown");
+    try app.runSchedulesFrom("PreShutdown");
 
     const rec = app.world.getResource(Recorder).?;
-    try std.testing.expectEqual(@as(usize, 6), rec.log.items.len);
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "startup"));
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "begin"));
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[2], "update"));
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[3], "render"));
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[4], "end"));
-    try std.testing.expect(std.mem.eql(u8, rec.log.items[5], "shutdown"));
+    try std.testing.expectEqual(@as(usize, 8), rec.log.items.len);
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "prestartup"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "startup"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[2], "begin"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[3], "update"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[4], "render"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[5], "end"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[6], "preshutdown"));
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[7], "shutdown"));
 
     cleanupRecorder(&app);
 }

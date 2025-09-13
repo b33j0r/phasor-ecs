@@ -26,8 +26,13 @@ pub fn default(allocator: std.mem.Allocator) !App {
     var app = App.init(allocator);
 
     // Add default schedules
+    _ = try app.addSchedule("PreStartup");
     _ = try app.addSchedule("Startup");
+    try app.scheduleAfter("Startup", "PreStartup");
+
+    _ = try app.addSchedule("PreShutdown");
     _ = try app.addSchedule("Shutdown");
+    try app.scheduleAfter("Shutdown", "PreShutdown");
 
     _ = try app.addSchedule("BetweenFrames");
 
@@ -36,9 +41,9 @@ pub fn default(allocator: std.mem.Allocator) !App {
     _ = try app.addSchedule("Render");
     _ = try app.addSchedule("EndFrame");
 
-    _ = try app.scheduleAfter("Update", "BeginFrame");
-    _ = try app.scheduleBefore("Render", "EndFrame");
-    _ = try app.scheduleAfter("Render", "Update");
+    try app.scheduleAfter("Update", "BeginFrame");
+    try app.scheduleBefore("Render", "EndFrame");
+    try app.scheduleAfter("Render", "Update");
 
     return app;
 }
@@ -125,7 +130,7 @@ pub fn step(self: *App) !void {
 
 /// Calls step repeatedly in a loop.
 pub fn run(self: *App) !u8 {
-    try self.runSchedulesFrom("Startup");
+    try self.runSchedulesFrom("PreStartup");
     while (true) {
         try self.step();
         if (self.world.hasResource(Exit)) {
@@ -133,7 +138,7 @@ pub fn run(self: *App) !u8 {
         }
         try self.runSchedulesFrom("BetweenFrames");
     }
-    try self.runSchedulesFrom("Shutdown");
+    try self.runSchedulesFrom("PreShutdown");
 
     const exit_res = self.world.getResource(Exit).?;
     return exit_res.code;
