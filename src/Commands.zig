@@ -65,6 +65,38 @@ pub fn removeEntity(self: *Commands, entity_id: Entity.Id) !void {
     });
 }
 
+pub fn addComponents(self: *Commands, entity_id: Entity.Id, components: anytype) !void {
+    const AddComponentsContext = struct {
+        entity_id: Entity.Id,
+        components: @TypeOf(components),
+
+        pub fn execute(ctx: *@This(), world: *World) anyerror!void {
+            try world.entities.addComponents(ctx.entity_id, ctx.components);
+        }
+    };
+
+    try self.command_buffer.queueContext(AddComponentsContext{
+        .entity_id = entity_id,
+        .components = components,
+    });
+}
+
+pub fn removeComponents(self: *Commands, entity_id: Entity.Id, components: anytype) !void {
+    const RemoveComponentsContext = struct {
+        entity_id: Entity.Id,
+        components: @TypeOf(components),
+
+        pub fn execute(ctx: *@This(), world: *World) anyerror!void {
+            try world.entities.removeComponents(ctx.entity_id, ctx.components);
+        }
+    };
+
+    try self.command_buffer.queueContext(RemoveComponentsContext{
+        .entity_id = entity_id,
+        .components = components,
+    });
+}
+
 pub fn insertResource(self: *Commands, resource_ptr: anytype) !void {
     try self.world.insertResource(resource_ptr);
 }

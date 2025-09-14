@@ -118,3 +118,91 @@ test "Commands removeEntity" {
     try cmds.apply();
     try std.testing.expect(world.entities.getEntityCount() == 0);
 }
+
+test "Commands addComponents" {
+    const allocator = std.testing.allocator;
+    var world = ecs.World.init(allocator);
+    defer world.deinit();
+
+    // Define test components
+    const Player = struct {};
+    const Health = struct { value: i32 };
+
+    // Create an entity immediately in the database
+    const id = try world.entities.createEntity(.{Foo{ .x = 0 }});
+
+    // Verify initial state
+    {
+        const e = world.entities.getEntity(id) orelse unreachable;
+        try std.testing.expect(e.get(Foo).?.x == 0);
+        try std.testing.expect(e.get(Player) == null);
+        try std.testing.expect(e.get(Health) == null);
+    }
+
+    var cmds = Commands.init(allocator, &world);
+    defer cmds.deinit();
+
+    // Queue adding components; should be deferred until apply()
+    try cmds.addComponents(id, .{ Player{}, Health{ .value = 100 } });
+
+    // Not applied yet; nothing should change
+    {
+        const e = world.entities.getEntity(id) orelse unreachable;
+        try std.testing.expect(e.get(Player) == null);
+        try std.testing.expect(e.get(Health) == null);
+    }
+
+    try cmds.apply();
+
+    // After apply, components should be present with correct values
+    {
+        const e = world.entities.getEntity(id) orelse unreachable;
+        try std.testing.expect(e.get(Player) != null);
+        try std.testing.expect(e.get(Health).?.value == 100);
+        try std.testing.expect(e.get(Foo) != null); // Original component remains
+    }
+}
+
+test "Commands removeComponents" {
+    const allocator = std.testing.allocator;
+    var world = ecs.World.init(allocator);
+    defer world.deinit();
+
+    // Define test components
+    const Player = struct {};
+    const Health = struct { value: i32 };
+
+    // Create an entity with multiple components
+    const id = try world.entities.createEntity(.{ Foo{ .x = 5 }, Player{}, Health{ .value = 250 } });
+
+    // Precondition check
+    {
+        const e = world.entities.getEntity(id) orelse unreachable;
+        try std.testing.expect(e.get(Foo).?.x == 5);
+        try std.testing.expect(e.get(Player) != null);
+        try std.testing.expect(e.get(Health).?.value == 250);
+    }
+
+    var cmds = Commands.init(allocator, &world);
+    defer cmds.deinit();
+
+    // Queue component removals by type
+    try cmds.removeComponents(id, .{ Player, Health });
+
+    // Not applied yet; nothing should change
+    {
+        const e = world.entities.getEntity(id) orelse unreachable;
+        try std.testing.expect(e.get(Player) != null);
+        try std.testing.expect(e.get(Health) != null);
+    }
+
+    try cmds.apply();
+
+    // After apply, removed components should be gone; Foo should remain
+    {
+        const e = world.entities.getEntity(id) orelse unreachable;
+        try std.testing.expect(e.get(Player) == null);
+        try std.testing.expect(e.get(Health) == null);
+        try std.testing.expect(e.get(Foo).?.x == 5);
+    }
+}
