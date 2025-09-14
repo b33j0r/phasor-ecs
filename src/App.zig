@@ -28,11 +28,15 @@ pub fn default(allocator: std.mem.Allocator) !App {
     // Add default schedules
     _ = try app.addSchedule("PreStartup");
     _ = try app.addSchedule("Startup");
+    _ = try app.addSchedule("PostStartup");
     try app.scheduleAfter("Startup", "PreStartup");
+    try app.scheduleAfter("PostStartup", "Startup");
 
     _ = try app.addSchedule("PreShutdown");
     _ = try app.addSchedule("Shutdown");
+    _ = try app.addSchedule("PostShutdown");
     try app.scheduleAfter("Shutdown", "PreShutdown");
+    try app.scheduleAfter("PostShutdown", "Shutdown");
 
     _ = try app.addSchedule("BetweenFrames");
 
