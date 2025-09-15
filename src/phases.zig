@@ -4,20 +4,41 @@ const App = root.App;
 const Commands = root.Commands;
 const Schedule = root.Schedule;
 
+pub const PhaseSchedules = struct {
+    enter: Schedule,
+    update: Schedule,
+    exit: Schedule,
+
+    pub fn init(allocator: std.mem.Allocator) PhaseSchedules {
+        return .{
+            .enter = Schedule.init(allocator),
+            .update = Schedule.init(allocator),
+            .exit = Schedule.init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *PhaseSchedules) void {
+        self.enter.deinit();
+        self.update.deinit();
+        self.exit.deinit();
+    }
+};
+
 pub const PhaseContext = struct {
     app: *App,
     commands: *Commands,
+    schedules: *PhaseSchedules,
 
-    pub fn addSchedule(self: PhaseContext, name: []const u8) !*Schedule {
-        const sched = try self.app.addSchedule(name);
-        // By default, place custom schedules between Update and Render for per-frame execution
-        try self.app.scheduleAfter(name, "Update");
-        try self.app.scheduleBefore(name, "Render");
-        return sched;
+    pub fn addEnterSystem(self: *PhaseContext, comptime system_fn: anytype) !void {
+        try self.schedules.enter.add(system_fn);
     }
 
-    pub fn removeSchedule(self: PhaseContext, name: []const u8) !void {
-        try self.app.removeSchedule(name);
+    pub fn addUpdateSystem(self: *PhaseContext, comptime system_fn: anytype) !void {
+        try self.schedules.update.add(system_fn);
+    }
+
+    pub fn addExitSystem(self: *PhaseContext, comptime system_fn: anytype) !void {
+        try self.schedules.exit.add(system_fn);
     }
 };
 
@@ -46,6 +67,23 @@ pub fn PhasesPlugin(comptime PhasesT: type, initial_phase: PhasesT) type {
 
             // Ensure phase transitions run every frame at the end of the frame
             try app.addSystem("BetweenFrames", Self.phase_transition_system);
+            // Run the active phase's update schedule during the normal Update schedule
+            try app.addSystem("Update", Self.run_phase_update_schedule);
+        }
+
+        pub fn cleanup(_: *Self, app: *App) void {
+            // On app shutdown, deinit and remove any remaining phase resources
+            if (app.world.hasResource(PhaseSchedules)) {
+                const ps = app.world.getResource(PhaseSchedules).?;
+                ps.deinit();
+                _ = app.world.removeResource(PhaseSchedules);
+            }
+            if (app.world.hasResource(CurrentPhase)) {
+                _ = app.world.removeResource(CurrentPhase);
+            }
+            if (app.world.hasResource(NextPhase)) {
+                _ = app.world.removeResource(NextPhase);
+            }
         }
 
         fn call_enter_on_leaf(comptime T: type, ptr: *T, ctx_val: *PhaseContext) anyerror!void {
@@ -110,33 +148,61 @@ pub fn PhasesPlugin(comptime PhasesT: type, initial_phase: PhasesT) type {
             }
         }
 
+        fn run_phase_update_schedule(commands: *Commands) !void {
+            const ps_opt = commands.world.getResource(PhaseSchedules);
+            if (ps_opt) |ps| {
+                try ps.update.run(commands);
+            }
+        }
+
         fn phase_transition_system(commands: *Commands) !void {
             // Only proceed if a next phase is requested
             if (!commands.world.hasResource(NextPhase)) {
                 return;
             }
 
-            var ctx = PhaseContext{
-                .app = Self.app_ptr.?,
-                .commands = commands,
-            };
+            const app = Self.app_ptr.?;
 
             const next_phase_res: *NextPhase = commands.world.getResource(NextPhase).?;
             const current_phase: ?*CurrentPhase = commands.world.getResource(CurrentPhase);
 
+            // If there is an existing phase, call its exit, run the exit schedule, and clean up schedules
             if (current_phase) |curr_phase| {
-                // Call exit on current leaf
-                try call_exit_on_leaf(@TypeOf(curr_phase.phase), &curr_phase.phase, &ctx);
+                var ctx_old = PhaseContext{ .app = app, .commands = commands, .schedules = undefined };
+                if (commands.world.getResource(PhaseSchedules)) |ps| {
+                    ctx_old.schedules = ps;
+                } else {
+                    // If missing schedules (should not happen), create a temporary empty one for ctx
+                    var temp = PhaseSchedules.init(app.allocator);
+                    defer temp.deinit();
+                    ctx_old.schedules = &temp;
+                }
+                try call_exit_on_leaf(@TypeOf(curr_phase.phase), &curr_phase.phase, &ctx_old);
+                if (commands.world.getResource(PhaseSchedules)) |ps| {
+                    // Run exit schedule then deinit and remove
+                    try ps.exit.run(commands);
+                    ps.deinit();
+                    _ = commands.removeResource(PhaseSchedules);
+                }
                 // Remove CurrentPhase resource
                 _ = commands.removeResource(CurrentPhase);
             }
 
-            // Update CurrentPhase resource first, so enter gets a stable address
+            // Set new CurrentPhase resource so enter gets a stable address
             try commands.insertResource(CurrentPhase{ .phase = next_phase_res.phase });
             const new_curr: *CurrentPhase = commands.world.getResource(CurrentPhase).?;
 
-            // Call enter on the new leaf
-            try call_enter_on_leaf(@TypeOf(new_curr.phase), &new_curr.phase, &ctx);
+            // Create and insert new schedules for this phase
+            const new_ps = PhaseSchedules.init(app.allocator);
+            try commands.insertResource(new_ps);
+            const ps_ptr = commands.world.getResource(PhaseSchedules).?;
+
+            // Prepare context with schedules and call enter on the new leaf
+            var ctx_new = PhaseContext{ .app = app, .commands = commands, .schedules = ps_ptr };
+            try call_enter_on_leaf(@TypeOf(new_curr.phase), &new_curr.phase, &ctx_new);
+
+            // Run enter schedule once
+            try ps_ptr.enter.run(commands);
 
             // Remove NextPhase resource
             _ = commands.removeResource(NextPhase);

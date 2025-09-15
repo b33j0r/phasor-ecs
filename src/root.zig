@@ -27,6 +27,7 @@ pub const GroupBy = systems_mod.GroupBy;
 const phases_mod = @import("phases.zig");
 pub const PhasesPlugin = phases_mod.PhasesPlugin;
 pub const PhaseContext = phases_mod.PhaseContext;
+pub const PhaseSchedules = phases_mod.PhaseSchedules;
 
 comptime {
     // Ensure that the dependencies are seen by the semantic analyzer

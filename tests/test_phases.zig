@@ -21,12 +21,8 @@ const CurrentPhase = PhasesPluginImpl.CurrentPhase;
 const NextPhase = PhasesPluginImpl.NextPhase;
 
 const MainMenu = struct {
-    pub fn enter(_: *MainMenu, ctx: PhaseContext) !void {
-        const schedule: *Schedule = try ctx.addSchedule("MainMenuUpdate");
-        try schedule.add(MainMenu.transition_to_next);
-    }
-    pub fn exit(_: *MainMenu, ctx: PhaseContext) !void {
-        try ctx.removeSchedule("MainMenuUpdate");
+    pub fn enter(_: *MainMenu, ctx: *PhaseContext) !void {
+        try ctx.addUpdateSystem(MainMenu.transition_to_next);
     }
     fn transition_to_next(commands: *Commands) !void {
         try commands.insertResource(NextPhase{ .phase = Phases{ .InGame = .{ .Playing = .{} } } });
@@ -39,12 +35,8 @@ const InGame = union(enum) {
 };
 
 const Playing = struct {
-    pub fn enter(_: *Playing, ctx: PhaseContext) !void {
-        const schedule: *Schedule = try ctx.addSchedule("InGameUpdate");
-        try schedule.add(Playing.check_for_pause);
-    }
-    pub fn exit(_: *Playing, ctx: PhaseContext) !void {
-        try ctx.removeSchedule("InGameUpdate");
+    pub fn enter(_: *Playing, ctx: *PhaseContext) !void {
+        try ctx.addUpdateSystem(Playing.check_for_pause);
     }
     fn check_for_pause(commands: *Commands) !void {
         // For testing purposes, we transition to Paused immediately
@@ -57,7 +49,6 @@ const Paused = struct {
         // Again for testing purposes, we exit the app immediately
         try ctx.commands.insertResource(Exit{ .code = 0 });
     }
-    pub fn exit(_: *Paused, _: *PhaseContext) !void {}
 };
 
 test "PhasePlugin transitions" {
