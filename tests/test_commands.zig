@@ -224,7 +224,7 @@ test "Commands query" {
     var query = try cmds.query(.{Foo});
     defer query.deinit();
 
-    try std.testing.expectEqual(@as(usize, 2), query.count());
+    try std.testing.expectEqual(2, query.count());
 
     var iterator = query.iterator();
 
@@ -235,4 +235,24 @@ test "Commands query" {
     try std.testing.expect(second_result.?.get(Foo).?.x == 20);
 
     try std.testing.expect(iterator.next() == null);
+}
+
+test "Commands scope" {
+    const Marker = struct {};
+
+    const allocator = std.testing.allocator;
+    var world = ecs.World.init(allocator);
+    defer world.deinit();
+
+    var cmds = Commands.init(allocator, &world);
+    defer cmds.deinit();
+
+    var scoped = try cmds.scoped(Marker);
+    const entity_id = try scoped.createEntity(.{Foo{ .x = 42 }});
+
+    try cmds.apply();
+
+    // check that the entity exists and has the Marker component
+    const e = world.entities.getEntity(entity_id) orelse unreachable;
+    try std.testing.expect(e.get(Marker) != null);
 }

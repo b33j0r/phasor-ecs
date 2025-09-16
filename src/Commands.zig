@@ -10,6 +10,10 @@ const World = root.World;
 const Entity = root.db.Entity;
 const QueryResult = root.db.QueryResult;
 
+const meta = @import("meta.zig");
+const Cons = meta.Cons;
+const consValue = meta.consValue;
+
 const Commands = @This();
 
 pub fn init(allocator: std.mem.Allocator, world: *World) Commands {
@@ -116,4 +120,61 @@ pub fn hasResource(self: *Commands, comptime T: type) bool {
 
 pub fn query(self: *Commands, comptime Parts: anytype) !QueryResult {
     return try self.world.entities.query(Parts);
+}
+
+/// Creates a wrapper that adds a DefaultComponentT to every
+/// newly created entity.
+pub fn Scoped(comptime DefaultComponentT: anytype) type {
+    return struct {
+        commands: ?*Commands = null,
+
+        const Self = @This();
+
+        pub fn init(c: *Commands) !Self {
+            return Self{
+                .commands = c,
+            };
+        }
+
+        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+            self.commands = commands;
+        }
+
+        pub fn createEntity(self: Self, components: anytype) !Entity.Id {
+            if (self.commands == null) {
+                return error.NotInitialized;
+            }
+            const combined_components = consValue(
+                DefaultComponentT{},
+                components,
+            );
+            return try self.commands.?.createEntity(combined_components);
+        }
+
+        pub fn removeEntity(self: Self, entity_id: Entity.Id) !void {
+            if (self.commands == null) {
+                return error.NotInitialized;
+            }
+            return try self.commands.?.removeEntity(entity_id);
+        }
+
+        pub fn addComponents(self: Self, entity_id: Entity.Id, components: anytype) !void {
+            if (self.commands == null) {
+                return error.NotInitialized;
+            }
+            return try self.commands.?.addComponents(entity_id, components);
+        }
+
+        pub fn removeComponents(self: Self, entity_id: Entity.Id, components: anytype) !void {
+            if (self.commands == null) {
+                return error.NotInitialized;
+            }
+            return try self.commands.?.removeComponents(entity_id, components);
+        }
+    };
+}
+
+pub fn scoped(self: *Commands, comptime DefaultComponentT: anytype) !Scoped(DefaultComponentT) {
+    const ScopedCommands = Scoped(DefaultComponentT);
+    return try ScopedCommands.init(self);
 }

@@ -4,6 +4,7 @@ const App = ecs.App;
 const Res = ecs.Res;
 const ResMut = ecs.ResMut;
 const ResOpt = ecs.ResOpt;
+const Scoped = ecs.Scoped;
 
 /// A simple recorder resource that logs events in order.
 const Recorder = struct {
@@ -211,4 +212,34 @@ test "App removed schedules are actually removed" {
     try std.testing.expect(std.mem.eql(u8, rec.log.items[1], "render"));
 
     cleanupRecorder(&app);
+}
+
+test "App scoped commands" {
+    const allocator = std.testing.allocator;
+    var app = try App.default(allocator);
+    defer app.deinit();
+
+    const Marker = struct {};
+    const Other = struct {
+        value: i32,
+    };
+
+    const create_marker_system = struct {
+        pub fn run(commands: Scoped(Marker)) !void {
+            _ = try commands.createEntity(.{Other{ .value = 42 }});
+        }
+    }.run;
+
+    try app.addSystem("Update", create_marker_system);
+
+    try app.step();
+
+    var query = try app.world.entities.query(.{Marker});
+    defer query.deinit();
+
+    try std.testing.expectEqual(@as(usize, 1), query.count());
+
+    var other_query = try app.world.entities.query(.{Other});
+    defer other_query.deinit();
+    try std.testing.expectEqual(@as(usize, 1), other_query.count());
 }

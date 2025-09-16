@@ -1,10 +1,16 @@
 const std = @import("std");
+
 const phasor_db = @import("phasor-db");
 const Entity = phasor_db.Entity;
 const GroupByResult = phasor_db.GroupByResult;
 const QueryResult = phasor_db.QueryResult;
+
 const ecs = @import("root.zig");
 const Commands = ecs.Commands;
+
+const meta = @import("meta.zig");
+const Cons = meta.Cons;
+const consValue = meta.consValue;
 
 // System Parameters
 //
@@ -96,12 +102,6 @@ pub fn Query(comptime Parts: anytype) type {
             return self.result.groupBy(TraitT);
         }
     };
-}
-
-/// A marker to specify that a component is NOT present
-/// in a query result.
-pub fn Without(comptime ComponentT: type) type {
-    return ComponentT;
 }
 
 /// `GroupBy(TraitT)` is a system parameter that provides grouped query results

@@ -5,6 +5,7 @@ const std = @import("std");
 const root = @import("root.zig");
 const System = root.System;
 const Commands = root.Commands;
+const Scoped = root.Scoped;
 
 pub fn from(comptime system_fn: anytype) !System {
     // Validate that system_fn is a function

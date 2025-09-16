@@ -8,13 +8,15 @@ pub const Exit = App.Exit;
 
 pub const CommandBuffer = @import("CommandBuffer.zig");
 pub const Command = @import("Command.zig");
-pub const Commands = @import("Commands.zig");
 pub const Plugin = @import("Plugin.zig");
 pub const ResourceManager = @import("ResourceManager.zig");
 pub const Schedule = @import("Schedule.zig");
 pub const ScheduleManager = @import("ScheduleManager.zig");
 pub const System = @import("System.zig");
 pub const World = @import("World.zig");
+
+pub const Commands = @import("Commands.zig");
+pub const Scoped = Commands.Scoped;
 
 const systems_mod = @import("systems.zig");
 pub const Res = systems_mod.Res;
