@@ -206,3 +206,33 @@ test "Commands removeComponents" {
         try std.testing.expect(e.get(Foo).?.x == 5);
     }
 }
+
+test "Commands query" {
+    const Player = struct {};
+
+    const allocator = std.testing.allocator;
+    var world = ecs.World.init(allocator);
+    defer world.deinit();
+
+    _ = try world.entities.createEntity(.{Foo{ .x = 10 }});
+    _ = try world.entities.createEntity(.{Foo{ .x = 20 }});
+    _ = try world.entities.createEntity(.{Player{}});
+
+    var cmds = Commands.init(allocator, &world);
+    defer cmds.deinit();
+
+    var query = try cmds.query(.{Foo});
+    defer query.deinit();
+
+    try std.testing.expectEqual(@as(usize, 2), query.count());
+
+    var iterator = query.iterator();
+
+    var first_result = iterator.next();
+    try std.testing.expect(first_result.?.get(Foo).?.x == 10);
+
+    var second_result = iterator.next();
+    try std.testing.expect(second_result.?.get(Foo).?.x == 20);
+
+    try std.testing.expect(iterator.next() == null);
+}

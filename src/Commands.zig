@@ -8,6 +8,7 @@ const root = @import("root.zig");
 const CommandBuffer = root.CommandBuffer;
 const World = root.World;
 const Entity = root.db.Entity;
+const QueryResult = root.db.QueryResult;
 
 const Commands = @This();
 
@@ -111,4 +112,8 @@ pub fn getResource(self: *Commands, comptime T: type) ?*T {
 
 pub fn hasResource(self: *Commands, comptime T: type) bool {
     return self.world.hasResource(T);
+}
+
+pub fn query(self: *Commands, comptime Parts: anytype) !QueryResult {
+    return try self.world.entities.query(Parts);
 }
