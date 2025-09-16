@@ -30,7 +30,7 @@ pub fn from(comptime system_fn: anytype) !System {
                     // Get transaction from database
                     args_tuple[i] = commands;
                 } else if (@hasDecl(ParamType, "init_system_param")) {
-                    // It's a system parameter (e.g., Res(T))
+                    // It's a system parameter (e.g., Res(T), Query(...), GroupBy(...))
                     var param_instance: ParamType = undefined;
                     try param_instance.init_system_param(commands);
                     args_tuple[i] = param_instance;
@@ -40,6 +40,16 @@ pub fn from(comptime system_fn: anytype) !System {
             }
 
             // Call the original system function with the prepared arguments
+            defer {
+                inline for (std.meta.fields(ArgsTupleType), 0..) |field, i| {
+                    const ParamType = field.type;
+                    if (ParamType != *Commands and
+                        @hasDecl(ParamType, "deinit"))
+                    {
+                        (&args_tuple[i]).deinit();
+                    }
+                }
+            }
             return @call(.auto, system_fn, args_tuple);
         }
     }.run;

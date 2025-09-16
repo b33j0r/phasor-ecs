@@ -83,10 +83,6 @@ test "System with Query(.{T}) param" {
             var total: usize = 0;
             while (iter.next()) |_| total += 1;
             try std.testing.expectEqual(@as(usize, 1), total);
-
-            // Explicitly deinit the query to free resources
-            var q_mut = q; // make a mutable copy to call deinit
-            q_mut.deinit();
         }
     }.system_with_query_param;
 
@@ -137,10 +133,6 @@ test "System with GroupBy(Trait) param" {
 
             try std.testing.expectEqual(@as(i32, 1), g1.key);
             try std.testing.expectEqual(@as(i32, 2), g2.key);
-
-            // Explicitly deinit the groups to free resources
-            var groups_mut = groups;
-            groups_mut.deinit();
         }
     }.system_with_groupby_param;
 
@@ -172,10 +164,6 @@ test "System with combination of params" {
 
             // Add another Player entity via commands
             _ = try commands.createEntity(.{Player{}});
-
-            // Explicitly deinit the query to free resources
-            var q_mut = q; // make a mutable copy to call deinit
-            q_mut.deinit();
         }
     }.system_with_combined_params;
 
