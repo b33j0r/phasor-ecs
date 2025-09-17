@@ -5,6 +5,7 @@ label: []const u8 = "",
 const std = @import("std");
 const root = @import("root.zig");
 const System = root.System;
+const World = root.World;
 
 const phasor_db = @import("phasor-db");
 const Commands = root.Commands;
@@ -43,8 +44,13 @@ pub fn add(self: *Schedule, comptime system_fn: anytype) !void {
     try self.systems.append(self.allocator, system);
 }
 
-pub fn run(self: *const Schedule, commands: *Commands) !void {
+pub fn run(self: *const Schedule, world: *World) !void {
     for (self.systems.items) |system| {
-        try system.run(commands);
+        var commands = world.commands();
+        defer commands.deinit();
+
+        try system.run(&commands);
+
+        try commands.apply();
     }
 }

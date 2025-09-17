@@ -47,13 +47,8 @@ test "System with transaction system param" {
     var schedule = Schedule.init(allocator);
     defer schedule.deinit();
 
-    var commands = world.commands();
-    defer commands.deinit();
-
     try schedule.add(system_with_tx_param_fn);
-    try schedule.run(&commands);
-
-    try commands.apply();
+    try schedule.run(&world);
 
     var query_result = try world.entities.query(.{Player});
     defer query_result.deinit();
@@ -71,9 +66,6 @@ test "System with Query(.{T}) param" {
     var schedule = Schedule.init(allocator);
     defer schedule.deinit();
 
-    var commands = world.commands();
-    defer commands.deinit();
-
     const system_with_query_param_fn = struct {
         pub fn system_with_query_param(q: Query(.{Player})) !void {
             // Should see exactly one Player entity
@@ -87,7 +79,7 @@ test "System with Query(.{T}) param" {
     }.system_with_query_param;
 
     try schedule.add(system_with_query_param_fn);
-    try schedule.run(&commands);
+    try schedule.run(&world);
 }
 
 test "System with GroupBy(Trait) param" {
@@ -118,9 +110,6 @@ test "System with GroupBy(Trait) param" {
     var schedule = Schedule.init(allocator);
     defer schedule.deinit();
 
-    var commands = world.commands();
-    defer commands.deinit();
-
     const system_with_groupby_param_fn = struct {
         pub fn system_with_groupby_param(groups: GroupBy(ComponentN)) !void {
             // Should see exactly two groups: key 1 and key 2
@@ -137,7 +126,7 @@ test "System with GroupBy(Trait) param" {
     }.system_with_groupby_param;
 
     try schedule.add(system_with_groupby_param_fn);
-    try schedule.run(&commands);
+    try schedule.run(&world);
 }
 
 test "System with combination of params" {
@@ -170,13 +159,8 @@ test "System with combination of params" {
     var schedule = Schedule.init(allocator);
     defer schedule.deinit();
 
-    var commands = world.commands();
-    defer commands.deinit();
-
     try schedule.add(system_with_combined_params_fn);
-    try schedule.run(&commands);
-
-    try commands.apply();
+    try schedule.run(&world);
 
     const health_res = world.getResource(Health) orelse unreachable;
     try std.testing.expect(health_res.current == 75);
@@ -204,11 +188,8 @@ test "System with Res(T) param" {
     var schedule = Schedule.init(allocator);
     defer schedule.deinit();
 
-    var commands = world.commands();
-    defer commands.deinit();
-
     try schedule.add(system_with_res_param_fn);
-    try schedule.run(&commands);
+    try schedule.run(&world);
 }
 
 test "System with ResMut(T) param" {
@@ -229,11 +210,8 @@ test "System with ResMut(T) param" {
     var schedule = Schedule.init(allocator);
     defer schedule.deinit();
 
-    var commands = world.commands();
-    defer commands.deinit();
-
     try schedule.add(system_with_res_param_fn);
-    try schedule.run(&commands);
+    try schedule.run(&world);
 
     // No entity changes queued; no need to apply commands
 
@@ -258,9 +236,6 @@ test "System with ResOpt(T) param" {
     var schedule = Schedule.init(allocator);
     defer schedule.deinit();
 
-    var commands = world.commands();
-    defer commands.deinit();
-
     try schedule.add(system_with_resopt_param_fn);
-    try schedule.run(&commands);
+    try schedule.run(&world);
 }

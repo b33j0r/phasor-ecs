@@ -47,7 +47,7 @@ const Playing = struct {
 const Paused = struct {
     pub fn enter(_: *Paused, ctx: *PhaseContext) !void {
         // Again for testing purposes, we exit the app immediately
-        try ctx.commands.insertResource(Exit{ .code = 0 });
+        try ctx.world.insertResource(Exit{ .code = 0 });
     }
 };
 

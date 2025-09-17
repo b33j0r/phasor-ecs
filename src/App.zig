@@ -117,16 +117,11 @@ pub fn scheduleAfter(self: *App, name: []const u8, other: []const u8) !void {
 }
 
 pub fn runSchedulesFrom(self: *App, start: []const u8) !void {
-    var commands = self.world.commands();
-    defer commands.deinit();
-
     var schedule_iter = try self.schedules.iterator(start);
     defer schedule_iter.deinit();
     while (schedule_iter.next()) |schedule| {
-        try schedule.run(&commands);
+        try schedule.run(&self.world);
     }
-
-    try commands.apply();
 }
 
 /// Advances the app by one tick/frame.

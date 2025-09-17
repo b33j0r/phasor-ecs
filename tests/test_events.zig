@@ -39,12 +39,9 @@ test "EventWriter enqueues into Events(T)" {
 
     var sched = Schedule.init(alloc);
     defer sched.deinit();
-    var cmds = world.commands();
-    defer cmds.deinit();
 
     try sched.add(sys);
-    try sched.run(&cmds);
-    try cmds.apply();
+    try sched.run(&world);
 
     const events = world.getResource(Events(i32)).?;
     const ev = try events.tryRecv();
@@ -77,11 +74,9 @@ test "EventReader drains all queued events" {
 
     var sched = Schedule.init(alloc);
     defer sched.deinit();
-    var cmds = world.commands();
-    defer cmds.deinit();
 
     try sched.add(sys);
-    try sched.run(&cmds);
+    try sched.run(&world);
 }
 
 test "EventWriter in one system, EventReader in another" {
@@ -106,11 +101,9 @@ test "EventWriter in one system, EventReader in another" {
 
     var sched = Schedule.init(alloc);
     defer sched.deinit();
-    var cmds = world.commands();
-    defer cmds.deinit();
 
     try sched.add(write_sys);
     try sched.add(read_sys);
 
-    try sched.run(&cmds);
+    try sched.run(&world);
 }

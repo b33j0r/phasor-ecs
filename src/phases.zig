@@ -3,6 +3,7 @@ const root = @import("root.zig");
 const App = root.App;
 const Commands = root.Commands;
 const Schedule = root.Schedule;
+const World = root.World;
 
 pub const PhaseSchedules = struct {
     enter: Schedule,
@@ -26,7 +27,7 @@ pub const PhaseSchedules = struct {
 
 pub const PhaseContext = struct {
     app: *App,
-    commands: *Commands,
+    world: *World,
     schedules: *PhaseSchedules,
 
     pub fn addEnterSystem(self: *PhaseContext, comptime system_fn: anytype) !void {
@@ -149,27 +150,29 @@ pub fn PhasesPlugin(comptime PhasesT: type, initial_phase: PhasesT) type {
         }
 
         fn run_phase_update_schedule(commands: *Commands) !void {
-            const ps_opt = commands.world.getResource(PhaseSchedules);
+            const world = commands.world;
+            const ps_opt = world.getResource(PhaseSchedules);
             if (ps_opt) |ps| {
-                try ps.update.run(commands);
+                try ps.update.run(world);
             }
         }
 
         fn phase_transition_system(commands: *Commands) !void {
+            const world = commands.world;
             // Only proceed if a next phase is requested
-            if (!commands.world.hasResource(NextPhase)) {
+            if (!world.hasResource(NextPhase)) {
                 return;
             }
 
             const app = Self.app_ptr.?;
 
-            const next_phase_res: *NextPhase = commands.world.getResource(NextPhase).?;
-            const current_phase: ?*CurrentPhase = commands.world.getResource(CurrentPhase);
+            const next_phase_res: *NextPhase = world.getResource(NextPhase).?;
+            const current_phase: ?*CurrentPhase = world.getResource(CurrentPhase);
 
             // If there is an existing phase, call its exit, run the exit schedule, and clean up schedules
             if (current_phase) |curr_phase| {
-                var ctx_old = PhaseContext{ .app = app, .commands = commands, .schedules = undefined };
-                if (commands.world.getResource(PhaseSchedules)) |ps| {
+                var ctx_old = PhaseContext{ .app = app, .world = world, .schedules = undefined };
+                if (world.getResource(PhaseSchedules)) |ps| {
                     ctx_old.schedules = ps;
                 } else {
                     // If missing schedules (should not happen), create a temporary empty one for ctx
@@ -178,34 +181,34 @@ pub fn PhasesPlugin(comptime PhasesT: type, initial_phase: PhasesT) type {
                     ctx_old.schedules = &temp;
                 }
                 try call_exit_on_leaf(@TypeOf(curr_phase.phase), &curr_phase.phase, &ctx_old);
-                if (commands.world.getResource(PhaseSchedules)) |ps| {
+                if (world.getResource(PhaseSchedules)) |ps| {
                     // Run exit schedule then deinit and remove
-                    try ps.exit.run(commands);
+                    try ps.exit.run(world);
                     ps.deinit();
-                    _ = commands.removeResource(PhaseSchedules);
+                    _ = world.removeResource(PhaseSchedules);
                 }
                 // Remove CurrentPhase resource
-                _ = commands.removeResource(CurrentPhase);
+                _ = world.removeResource(CurrentPhase);
             }
 
             // Set new CurrentPhase resource so enter gets a stable address
-            try commands.insertResource(CurrentPhase{ .phase = next_phase_res.phase });
-            const new_curr: *CurrentPhase = commands.world.getResource(CurrentPhase).?;
+            try world.insertResource(CurrentPhase{ .phase = next_phase_res.phase });
+            const new_curr: *CurrentPhase = world.getResource(CurrentPhase).?;
 
             // Create and insert new schedules for this phase
             const new_ps = PhaseSchedules.init(app.allocator);
-            try commands.insertResource(new_ps);
-            const ps_ptr = commands.world.getResource(PhaseSchedules).?;
+            try world.insertResource(new_ps);
+            const ps_ptr = world.getResource(PhaseSchedules).?;
 
             // Prepare context with schedules and call enter on the new leaf
-            var ctx_new = PhaseContext{ .app = app, .commands = commands, .schedules = ps_ptr };
+            var ctx_new = PhaseContext{ .app = app, .world = world, .schedules = ps_ptr };
             try call_enter_on_leaf(@TypeOf(new_curr.phase), &new_curr.phase, &ctx_new);
 
             // Run enter schedule once
-            try ps_ptr.enter.run(commands);
+            try ps_ptr.enter.run(world);
 
             // Remove NextPhase resource
-            _ = commands.removeResource(NextPhase);
+            _ = world.removeResource(NextPhase);
         }
     };
 }

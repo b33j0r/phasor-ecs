@@ -3,9 +3,10 @@ run: *const fn (commands: *Commands) anyerror!void,
 const std = @import("std");
 
 const root = @import("root.zig");
-const System = root.System;
 const Commands = root.Commands;
 const Scoped = root.Scoped;
+const System = root.System;
+const World = root.World;
 
 pub fn from(comptime system_fn: anytype) !System {
     // Validate that system_fn is a function
