@@ -1,5 +1,6 @@
 pub const db = @import("phasor-db");
 pub const Entity = db.Entity;
+pub const Without = db.Without;
 
 pub const graph = @import("phasor-graph");
 
@@ -28,7 +29,6 @@ pub const Res = systems_mod.Res;
 pub const ResMut = systems_mod.ResMut;
 pub const ResOpt = systems_mod.ResOpt;
 pub const Query = systems_mod.Query;
-pub const Without = systems_mod.Without;
 pub const GroupBy = systems_mod.GroupBy;
 
 const phases_mod = @import("phases.zig");
