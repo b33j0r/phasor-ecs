@@ -56,6 +56,9 @@ pub fn insert(self: *ResourceManager, resource: anytype) !void {
         .destructor = struct {
             fn destroy(resource_ptr: *anyopaque, alloc: std.mem.Allocator) void {
                 const typed_ptr: *T = @ptrCast(@alignCast(resource_ptr));
+                if (@hasDecl(T, "deinit")) {
+                    typed_ptr.deinit();
+                }
                 alloc.destroy(typed_ptr);
             }
         }.destroy,
