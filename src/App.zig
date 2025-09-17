@@ -10,6 +10,7 @@ const Plugin = root.Plugin;
 const ScheduleManager = root.ScheduleManager;
 const Schedule = root.Schedule;
 const World = root.World;
+const Events = root.Events;
 
 const App = @This();
 
@@ -152,4 +153,10 @@ pub fn run(self: *App) !u8 {
 /// Adds a resource to the world.
 pub fn insertResource(self: *App, resource: anytype) !void {
     try self.world.insertResource(resource);
+}
+
+/// Registers an event type in the world. Under the hood this
+/// simply inserts an `Events(T)` resource.
+pub fn registerEvent(comptime T: type, self: *App, capacity: usize) !void {
+    self.world.registerEvent(T, capacity);
 }

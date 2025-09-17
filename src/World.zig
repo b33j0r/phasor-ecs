@@ -7,6 +7,7 @@ const root = @import("root.zig");
 const Database = root.db.Database;
 const ResourceManager = root.ResourceManager;
 const Commands = root.Commands;
+const Events = root.Events;
 
 const World = @This();
 
@@ -45,4 +46,12 @@ pub fn getResource(self: *World, comptime T: type) ?*T {
 
 pub fn getResourceMut(self: *World, comptime T: type) ?*T {
     return self.resources.get(T);
+}
+
+pub fn registerEvent(self: *World, comptime T: type, capacity: usize) !void {
+    if (self.hasResource(Events(T))) {
+        return error.EventAlreadyRegistered;
+    }
+    const events = try Events(T).init(self.allocator, capacity);
+    try self.insertResource(events);
 }

@@ -15,6 +15,11 @@ pub const ScheduleManager = @import("ScheduleManager.zig");
 pub const System = @import("System.zig");
 pub const World = @import("World.zig");
 
+const events = @import("events.zig");
+pub const Events = events.Events;
+pub const EventReader = events.EventReader;
+pub const EventWriter = events.EventWriter;
+
 pub const Commands = @import("Commands.zig");
 pub const Scoped = Commands.Scoped;
 
