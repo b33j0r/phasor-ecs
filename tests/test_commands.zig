@@ -256,3 +256,43 @@ test "Commands scope" {
     const e = world.entities.getEntity(entity_id) orelse unreachable;
     try std.testing.expect(e.get(Marker) != null);
 }
+
+test "Commands addComponent (singular)" {
+    const Health = struct { value: i32 };
+
+    const allocator = std.testing.allocator;
+    var world = ecs.World.init(allocator);
+    defer world.deinit();
+
+    const id = try world.entities.createEntity(.{Foo{ .x = 99 }});
+
+    var cmds = Commands.init(allocator, &world);
+    defer cmds.deinit();
+
+    try cmds.addComponent(id, Health{ .value = 75 });
+
+    try cmds.apply();
+
+    const e = world.entities.getEntity(id) orelse unreachable;
+    try std.testing.expect(e.get(Health).?.value == 75);
+}
+
+test "Commands removeComponent (singular)" {
+    const Health = struct { value: i32 };
+
+    const allocator = std.testing.allocator;
+    var world = ecs.World.init(allocator);
+    defer world.deinit();
+
+    const id = try world.entities.createEntity(.{ Foo{ .x = 88 }, Health{ .value = 150 } });
+
+    var cmds = Commands.init(allocator, &world);
+    defer cmds.deinit();
+
+    try cmds.removeComponent(id, Health);
+
+    try cmds.apply();
+
+    const e = world.entities.getEntity(id) orelse unreachable;
+    try std.testing.expect(e.get(Health) == null);
+}

@@ -70,6 +70,14 @@ pub fn removeEntity(self: *Commands, entity_id: Entity.Id) !void {
     });
 }
 
+pub fn addComponent(self: *Commands, entity_id: Entity.Id, component: anytype) !void {
+    try self.addComponents(entity_id, .{component});
+}
+
+pub fn removeComponent(self: *Commands, entity_id: Entity.Id, comptime T: type) !void {
+    try self.removeComponents(entity_id, .{T});
+}
+
 pub fn addComponents(self: *Commands, entity_id: Entity.Id, components: anytype) !void {
     const AddComponentsContext = struct {
         entity_id: Entity.Id,
