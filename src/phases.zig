@@ -6,6 +6,10 @@ const Commands = root.Commands;
 const Schedule = root.Schedule;
 const World = root.World;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Schedules & Context (compatible with your existing code)
+// ─────────────────────────────────────────────────────────────────────────────
+
 /// Per-transition and active-update schedules.
 /// - `enter` and `exit` are single-use staging schedules executed immediately during a transition.
 /// - `update` is the active pipeline for the current path (rebuilt each transition).
@@ -68,7 +72,157 @@ pub const PhaseContext = struct {
     }
 };
 
-/// Build a hierarchical phases plugin from a tagged-union type.
+// ─────────────────────────────────────────────────────────────────────────────
+//// IR (Path → Diff → Plan)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const NodeKind = enum { Union, Struct };
+
+const EnterFn = *const fn (*anyopaque, *PhaseContext) anyerror!void;
+const ExitFn = *const fn (*anyopaque, *PhaseContext) anyerror!void;
+
+fn noEnter(_: *anyopaque, _: *PhaseContext) anyerror!void {}
+fn noExit(_: *anyopaque, _: *PhaseContext) anyerror!void {}
+
+fn wrapEnter(comptime T: type) EnterFn {
+    if (@hasDecl(T, "enter")) {
+        return struct {
+            fn f(p: *anyopaque, ctx: *PhaseContext) anyerror!void {
+                const tp: *T = @ptrCast(@alignCast(p));
+                return T.enter(tp, ctx);
+            }
+        }.f;
+    }
+    return noEnter;
+}
+
+fn wrapExit(comptime T: type) ExitFn {
+    if (@hasDecl(T, "exit")) {
+        return struct {
+            fn f(p: *anyopaque, ctx: *PhaseContext) anyerror!void {
+                const tp: *T = @ptrCast(@alignCast(p));
+                return T.exit(tp, ctx);
+            }
+        }.f;
+    }
+    return noExit;
+}
+
+const NodeRef = struct {
+    /// Stable identity for LCA comparison. For unions we use the TYPE name (not tag),
+    /// so swapping variants under the same parent still shares the union node.
+    label: []const u8,
+    ptr: *anyopaque,
+    kind: NodeKind,
+    enter_fn: EnterFn,
+    exit_fn: ExitFn,
+};
+
+const NodeChain = struct {
+    buf: [16]NodeRef = undefined,
+    len: usize = 0,
+
+    fn push(self: *NodeChain, n: NodeRef) !void {
+        if (self.len == self.buf.len) return error.TooDeep;
+        self.buf[self.len] = n;
+        self.len += 1;
+    }
+
+    fn slice(self: *const NodeChain) []const NodeRef {
+        return self.buf[0..self.len];
+    }
+};
+
+/// Build a normalized path from root → leaf. Labels use type names only.
+fn buildChain(comptime T: type, ptr: anytype, chain: *NodeChain) !void {
+    comptime std.debug.assert(@typeInfo(@TypeOf(ptr)) == .pointer);
+
+    switch (@typeInfo(T)) {
+        .@"union" => |u| {
+            // Push the union node itself (LCA will match on type name).
+            try chain.push(.{
+                .label = @typeName(T),
+                .ptr = @ptrCast(@constCast(ptr)),
+                .kind = .Union,
+                .enter_fn = wrapEnter(T),
+                .exit_fn = wrapExit(T),
+            });
+
+            // Recurse into the active payload.
+            const tag = std.meta.activeTag(ptr.*);
+            inline for (u.fields) |f| {
+                if (std.mem.eql(u8, @tagName(tag), f.name)) {
+                    const FT = f.type;
+                    const child_ptr = &@field(ptr.*, f.name);
+
+                    switch (@typeInfo(FT)) {
+                        .@"union" => try buildChain(FT, child_ptr, chain),
+                        .@"struct" => try chain.push(.{
+                            .label = @typeName(FT),
+                            .ptr = @ptrCast(@constCast(child_ptr)),
+                            .kind = .Struct,
+                            .enter_fn = wrapEnter(FT),
+                            .exit_fn = wrapExit(FT),
+                        }),
+                        else => {},
+                    }
+                }
+            }
+        },
+        .@"struct" => {
+            try chain.push(.{
+                .label = @typeName(T),
+                .ptr = @ptrCast(ptr),
+                .kind = .Struct,
+                .enter_fn = wrapEnter(T),
+                .exit_fn = wrapExit(T),
+            });
+        },
+        else => return error.UnsupportedPhaseType,
+    }
+}
+
+fn lowestCommonIndex(a: *const NodeChain, b: *const NodeChain) usize {
+    const as = a.slice();
+    const bs = b.slice();
+    const n = @min(as.len, bs.len);
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        if (!std.mem.eql(u8, as[i].label, bs[i].label)) break;
+    }
+    return i; // first differing index; nodes [0..i) are common
+}
+
+const Action = union(enum) { Exit: usize, Enter: usize };
+
+const Plan = struct {
+    actions: [32]Action = undefined,
+    len: usize = 0,
+
+    fn push(self: *Plan, a: Action) !void {
+        if (self.len == self.actions.len) return error.PlanTooLarge;
+        self.actions[self.len] = a;
+        self.len += 1;
+    }
+};
+
+fn buildPlan(plan: *Plan, old_chain: *const NodeChain, new_chain: *const NodeChain, lca: usize) void {
+    // Exits: old leaf → lca (exclusive)
+    var i: isize = @as(isize, @intCast(old_chain.len)) - 1;
+    while (i >= 0 and @as(isize, @intCast(i)) >= lca) : (i -= 1) {
+        plan.push(.{ .Exit = @as(usize, @intCast(i)) }) catch unreachable;
+    }
+    // Enters: lca → new leaf (inclusive)
+    var j: usize = lca;
+    while (j < new_chain.len) : (j += 1) {
+        plan.push(.{ .Enter = j }) catch unreachable;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public plugin API (same shape as your old one, but using the IR core)
+// ─────────────────────────────────────────────────────────────────────────────
+
 pub fn PhasesPlugin(comptime PhasesT: type, initial_phase: PhasesT) type {
     return struct {
         pub const Phases = PhasesT;
@@ -92,8 +246,10 @@ pub fn PhasesPlugin(comptime PhasesT: type, initial_phase: PhasesT) type {
         pub fn build(_: *Self, app: *App) !void {
             Self.app_ptr = app;
 
+            // Seed the very first transition to the initial phase.
             try app.insertResource(NextPhase{ .phase = initial_phase });
 
+            // BetweenFrames drives transitions; Update runs the live pipeline.
             try app.addSystem("BetweenFrames", Self.handle_phase_transitions);
             try app.addSystem("Update", Self.run_phase_update_schedule);
         }
@@ -107,6 +263,8 @@ pub fn PhasesPlugin(comptime PhasesT: type, initial_phase: PhasesT) type {
             if (app.world.hasResource(NextPhase)) _ = app.world.removeResource(NextPhase);
         }
 
+        // ───────────── Systems ─────────────
+
         /// Run active update pipeline every frame.
         fn run_phase_update_schedule(commands: *Commands) !void {
             const world = commands.world;
@@ -115,40 +273,7 @@ pub fn PhasesPlugin(comptime PhasesT: type, initial_phase: PhasesT) type {
             }
         }
 
-        /// Internal helper: recursive DCA with an explicit `is_root` flag.
-        fn dcaImpl(comptime T: type, a: *const T, b: *const T, depth: usize, comptime is_root: bool) usize {
-            const ti = @typeInfo(T);
-            switch (ti) {
-                .@"union" => |u| {
-                    if (u.tag_type == null) return depth;
-
-                    const tag_a = std.meta.activeTag(a.*);
-                    const tag_b = std.meta.activeTag(b.*);
-
-                    if (tag_a != tag_b) {
-                        // At root, different tags => nothing in common.
-                        // At deeper unions, count THIS union node as common, so return depth + 1.
-                        return if (is_root) depth else depth + 1;
-                    }
-
-                    // Same tag: this union node is common.
-                    return switch (a.*) {
-                        inline else => |*pa, tag| {
-                            const pb = &@field(b.*, @tagName(tag));
-                            const PT = @TypeOf(pa.*);
-                            return dcaImpl(PT, pa, pb, depth + 1, false);
-                        },
-                    };
-                },
-                .@"struct" => return depth + 1,
-                else => return depth + 1,
-            }
-        }
-
-        fn deepestCommonDepth(comptime T: type, a: *const T, b: *const T) usize {
-            return dcaImpl(T, a, b, 0, true);
-        }
-
+        /// Transition driver: build IRs, compute plan, run exits/enters, rebuild update.
         fn handle_phase_transitions(commands: *Commands) !void {
             const world = commands.world;
             if (!world.hasResource(NextPhase)) return;
@@ -166,7 +291,7 @@ pub fn PhasesPlugin(comptime PhasesT: type, initial_phase: PhasesT) type {
                 break :blk world.getResource(PhaseSchedules).?;
             };
 
-            // Always start a transition by clearing enter/exit staging.
+            // Prepare staging
             ps_ptr.clearEnterExit(allocator);
 
             var ctx = PhaseContext{
@@ -175,136 +300,62 @@ pub fn PhasesPlugin(comptime PhasesT: type, initial_phase: PhasesT) type {
                 .schedules = ps_ptr,
             };
 
-            // Compute DCA ONCE vs. old current and next.
-            var common_depth: usize = 0;
-            const had_current = world.hasResource(CurrentPhase);
-            if (had_current) {
+            // Build chains (old may be empty on first activation)
+            var old_chain: NodeChain = .{};
+            var new_chain: NodeChain = .{};
+            var have_old = false;
+
+            if (world.hasResource(CurrentPhase)) {
                 const curr_res: *CurrentPhase = world.getResource(CurrentPhase).?;
-                const curr_phase_ptr: *const Phases = &curr_res.phase;
-
-                common_depth = deepestCommonDepth(Phases, curr_phase_ptr, next_phase_ptr);
-
-                // Exit tail (leaf -> up) strictly below the DCA.
-                try exitTailFromDepth(Phases, curr_phase_ptr, &ctx, common_depth, 1);
-                try ps_ptr.exit.run(world);
-                ps_ptr.clearEnterExit(allocator);
-
-                // Swap CurrentPhase to NEXT.
-                _ = world.removeResource(CurrentPhase);
-                try world.insertResource(CurrentPhase{ .phase = next_res.phase });
-            } else {
-                // First activation: treat as crossing root.
-                common_depth = 0;
-                try world.insertResource(CurrentPhase{ .phase = next_res.phase });
+                try buildChain(Phases, &curr_res.phase, &old_chain);
+                have_old = true;
             }
+            try buildChain(Phases, next_phase_ptr, &new_chain);
 
-            // Rebuild the active update pipeline for the new path.
+            const lca = if (have_old) lowestCommonIndex(&old_chain, &new_chain) else 0;
+
+            var plan: Plan = .{};
+            buildPlan(&plan, &old_chain, &new_chain, lca);
+
+            // Execute EXITS (leaf → LCA), then flush exit schedule immediately
+            var k: usize = 0;
+            while (k < plan.len) : (k += 1) {
+                const act = plan.actions[k];
+                switch (act) {
+                    .Exit => |idx| {
+                        const n = old_chain.buf[idx];
+                        try n.exit_fn(n.ptr, &ctx);
+                    },
+                    else => {},
+                }
+            }
+            try ps_ptr.exit.run(world);
+            ps_ptr.clearEnterExit(allocator);
+
+            // Commit CurrentPhase = NextPhase
+            if (world.hasResource(CurrentPhase)) _ = world.removeResource(CurrentPhase);
+            try world.insertResource(CurrentPhase{ .phase = next_res.phase });
+
+            // Rebuild UPDATE before Enter (so enter can add to a clean pipeline)
             ps_ptr.clearUpdate(allocator);
 
-            // Enter tail (down -> leaf) strictly below the SAME DCA.
-            const now_curr: *CurrentPhase = world.getResource(CurrentPhase).?;
-            try enterTailFromDepth(Phases, &now_curr.phase, &ctx, common_depth, 1);
+            // Execute ENTERS (LCA → leaf), then flush enter schedule immediately
+            k = 0;
+            while (k < plan.len) : (k += 1) {
+                const act2 = plan.actions[k];
+                switch (act2) {
+                    .Enter => |idx| {
+                        const n2 = new_chain.buf[idx];
+                        try n2.enter_fn(n2.ptr, &ctx);
+                    },
+                    else => {},
+                }
+            }
             try ps_ptr.enter.run(world);
             ps_ptr.clearEnterExit(allocator);
 
-            // Clear the transition request.
+            // Clear the transition request
             _ = world.removeResource(NextPhase);
-        }
-
-        /// Exit nodes with depth > common_depth (leaf → root).
-        fn exitTailFromDepth(comptime T: type, node: *const T, ctx: *PhaseContext, common_depth: usize, current_depth: usize) anyerror!void {
-            const ti = @typeInfo(T);
-            switch (ti) {
-                .@"union" => {
-                    // Dive to the active payload first (leaf-first).
-                    switch (node.*) {
-                        inline else => |*payload| {
-                            const PT = @TypeOf(payload.*);
-                            try exitTailFromDepth(PT, payload, ctx, common_depth, current_depth + 1);
-                        },
-                    }
-                    if (current_depth > common_depth) {
-                        try call_exit_on_node(T, @constCast(node), ctx);
-                    }
-                },
-                else => {
-                    if (current_depth > common_depth) {
-                        try call_exit_on_node(T, @constCast(node), ctx);
-                    }
-                },
-            }
-        }
-
-        /// Enter nodes with depth > common_depth (root → leaf).
-        fn enterTailFromDepth(comptime T: type, node: *const T, ctx: *PhaseContext, common_depth: usize, current_depth: usize) anyerror!void {
-            const ti = @typeInfo(T);
-            switch (ti) {
-                .@"union" => {
-                    if (current_depth > common_depth) {
-                        try call_enter_on_node(T, @constCast(node), ctx);
-                    }
-                    // Then descend into the active payload.
-                    switch (node.*) {
-                        inline else => |*payload| {
-                            const PT = @TypeOf(payload.*);
-                            try enterTailFromDepth(PT, payload, ctx, common_depth, current_depth + 1);
-                        },
-                    }
-                },
-                else => {
-                    if (current_depth > common_depth) {
-                        try call_enter_on_node(T, @constCast(node), ctx);
-                    }
-                },
-            }
-        }
-
-        /// Calls `T.enter(self: *T, ctx: *PhaseContext)` or `T.enter(self: *T, ctx: PhaseContext)` if present.
-        fn call_enter_on_node(comptime T: type, ptr: *T, ctx_val: *PhaseContext) anyerror!void {
-            const ti = @typeInfo(T);
-            if (ti != .@"struct" and ti != .@"union") return;
-            if (!@hasDecl(T, "enter")) return;
-
-            const FnT = @TypeOf(T.enter);
-            if (@typeInfo(FnT) != .@"fn") return;
-            const f = @typeInfo(FnT).@"fn";
-            if (f.params.len < 2) return;
-
-            if (f.params[0].type) |P0| {
-                if (P0 != *T and P0 != *const T) return;
-            } else return;
-
-            if (f.params[1].type) |P1| {
-                if (P1 == *PhaseContext) {
-                    return T.enter(ptr, ctx_val);
-                } else if (P1 == PhaseContext) {
-                    return T.enter(ptr, ctx_val.*);
-                }
-            }
-        }
-
-        /// Calls `T.exit(self: *T, ctx: *PhaseContext)` or `T.exit(self: *T, ctx: PhaseContext)` if present.
-        fn call_exit_on_node(comptime T: type, ptr: *T, ctx_val: *PhaseContext) anyerror!void {
-            const ti = @typeInfo(T);
-            if (ti != .@"struct" and ti != .@"union") return;
-            if (!@hasDecl(T, "exit")) return;
-
-            const FnT = @TypeOf(T.exit);
-            if (@typeInfo(FnT) != .@"fn") return;
-            const f = @typeInfo(FnT).@"fn";
-            if (f.params.len < 2) return;
-
-            if (f.params[0].type) |P0| {
-                if (P0 != *T and P0 != *const T) return;
-            } else return;
-
-            if (f.params[1].type) |P1| {
-                if (P1 == *PhaseContext) {
-                    return T.exit(ptr, ctx_val);
-                } else if (P1 == PhaseContext) {
-                    return T.exit(ptr, ctx_val.*);
-                }
-            }
         }
     };
 }

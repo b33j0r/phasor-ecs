@@ -180,6 +180,8 @@ test "phases transition full round trip (deterministic)" {
     };
 
     const got = app.world.getResource(TransitionTracker).?.events.items;
+    std.debug.print("\nEvents:", .{});
+    for (got) |g| std.debug.print("\n  Event: {s}", .{g});
     try std.testing.expectEqual(expected.len, got.len);
     for (expected, 0..) |e, i| {
         try std.testing.expectEqualStrings(e, got[i]);
