@@ -160,7 +160,7 @@ pub fn hasResource(self: *App, comptime T: type) bool {
     return self.world.hasResource(T);
 }
 
-pub fn removeResource(self: *App, comptime T: type) !void {
+pub fn removeResource(self: *App, comptime T: type) bool {
     return self.world.removeResource(T);
 }
 
