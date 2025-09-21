@@ -151,8 +151,21 @@ pub fn insertResource(self: *App, resource: anytype) !void {
     try self.world.insertResource(resource);
 }
 
+/// Gets a resource from the world, returning null if it doesn't exist.
+pub fn getResource(self: *App, comptime T: type) ?*T {
+    return self.world.getResource(T);
+}
+
+pub fn hasResource(self: *App, comptime T: type) bool {
+    return self.world.hasResource(T);
+}
+
+pub fn removeResource(self: *App, comptime T: type) !void {
+    return self.world.removeResource(T);
+}
+
 /// Registers an event type in the world. Under the hood this
 /// simply inserts an `Events(T)` resource.
-pub fn registerEvent(comptime T: type, self: *App, capacity: usize) !void {
-    self.world.registerEvent(T, capacity);
+pub fn registerEvent(self: *App, comptime T: type, capacity: usize) !void {
+    try self.world.registerEvent(T, capacity);
 }
