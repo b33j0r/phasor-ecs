@@ -125,23 +125,24 @@ pub fn runSchedulesFrom(self: *App, start: []const u8) !void {
 }
 
 /// Advances the app by one tick/frame.
-pub fn step(self: *App) !void {
+pub fn step(self: *App) !?Exit {
     try self.runSchedulesFrom(self.step_start_schedule_name);
+    if (self.world.getResource(Exit)) |exit| {
+        return exit.*;
+    }
+    try self.runSchedulesFrom("BetweenFrames");
+    return null;
 }
 
 /// Calls step repeatedly in a loop.
 pub fn run(self: *App) !u8 {
     try self.runSchedulesFrom("PreStartup");
-    while (true) {
-        try self.step();
-        if (self.world.hasResource(Exit)) {
-            break;
+    const exit_res: Exit = blk: while (true) {
+        if (try self.step()) |exit| {
+            break :blk exit;
         }
-        try self.runSchedulesFrom("BetweenFrames");
-    }
+    };
     try self.runSchedulesFrom("PreShutdown");
-
-    const exit_res = self.world.getResource(Exit).?;
     return exit_res.code;
 }
 

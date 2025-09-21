@@ -47,7 +47,7 @@ test "default schedules execute in expected game order" {
 
     // Run one frame only
     try app.runSchedulesFrom("PreStartup");
-    try app.step(); // runs BeginFrame -> Update -> Render -> EndFrame
+    _ = try app.step(); // runs BeginFrame -> Update -> Render -> EndFrame
     try app.runSchedulesFrom("PreShutdown");
 
     const rec = app.world.getResource(Recorder).?;
@@ -84,7 +84,7 @@ test "custom game schedule fits between default ones" {
     try app.addSystem("Physics", appendMark("physics"));
     try app.addSystem("Render", appendMark("render"));
 
-    try app.step();
+    _ = try app.step();
 
     const rec = app.world.getResource(Recorder).?;
     try std.testing.expectEqual(@as(usize, 3), rec.log.items.len);
@@ -105,10 +105,8 @@ test "between frames schedule runs every tick" {
     try app.addSystem("BetweenFrames", appendMark("between"));
 
     // Run two ticks
-    try app.step();
-    try app.runSchedulesFrom("BetweenFrames");
-    try app.step();
-    try app.runSchedulesFrom("BetweenFrames");
+    _ = try app.step();
+    _ = try app.step();
 
     const rec = app.world.getResource(Recorder).?;
     // We only added to BetweenFrames, so we should see two entries.
@@ -204,7 +202,7 @@ test "App removed schedules are actually removed" {
     // Remove the custom schedule before running
     try app.removeSchedule("Physics");
 
-    try app.step();
+    _ = try app.step();
 
     const rec = app.world.getResource(Recorder).?;
     try std.testing.expectEqual(@as(usize, 2), rec.log.items.len);
@@ -232,7 +230,7 @@ test "App scoped commands" {
 
     try app.addSystem("Update", create_marker_system);
 
-    try app.step();
+    _ = try app.step();
 
     var query = try app.world.entities.query(.{Marker});
     defer query.deinit();

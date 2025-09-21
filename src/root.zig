@@ -31,11 +31,6 @@ pub const ResOpt = systems_mod.ResOpt;
 pub const Query = systems_mod.Query;
 pub const GroupBy = systems_mod.GroupBy;
 
-const phases_mod = @import("phases.zig");
-pub const PhasesPlugin = phases_mod.PhasesPlugin;
-pub const PhaseContext = phases_mod.PhaseContext;
-pub const PhaseSchedules = phases_mod.PhaseSchedules;
-
 comptime {
     // Ensure that the dependencies are seen by the semantic analyzer
     _ = db;
@@ -50,5 +45,4 @@ comptime {
     _ = System;
     _ = World;
     _ = systems_mod;
-    _ = phases_mod;
 }
