@@ -82,6 +82,11 @@ pub fn Query(comptime Parts: anytype) type {
             self.result.deinit();
         }
 
+        /// Returns true if the query has no matching entities.
+        pub fn isEmpty(self: *const Self) bool {
+            return self.result.count() == 0;
+        }
+
         /// Number of entities matching the query.
         pub fn count(self: *const Self) usize {
             return self.result.count();
@@ -100,6 +105,20 @@ pub fn Query(comptime Parts: anytype) type {
         /// Group the results by a trait.
         pub fn groupBy(self: *const Self, TraitT: anytype) !GroupByResult {
             return self.result.groupBy(TraitT);
+        }
+
+        /// Collect the results into an array.
+        pub fn listAlloc(self: *const Self, allocator: std.mem.Allocator) ![]Entity {
+            return self.result.listAlloc(allocator);
+        }
+
+        /// Collect the results into an array and sort them.
+        pub fn sortAlloc(
+            self: *const Self,
+            allocator: std.mem.Allocator,
+            ctx: anytype,
+        ) ![]Entity {
+            return self.result.sortAlloc(allocator, ctx);
         }
     };
 }
