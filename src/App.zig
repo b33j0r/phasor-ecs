@@ -116,6 +116,16 @@ pub fn scheduleAfter(self: *App, name: []const u8, other: []const u8) !void {
     try self.schedules.scheduleAfter(name, other);
 }
 
+/// Constrain schedule execution order: name must run after first and before last
+pub fn scheduleBetween(self: *App, name: []const u8, first: []const u8, last: []const u8) !void {
+    try self.schedules.scheduleBetween(name, first, last);
+}
+
+/// Add a new schedule and constrain its execution order between first and last
+pub fn addScheduleBetween(self: *App, name: []const u8, first: []const u8, last: []const u8) !*Schedule {
+    return try self.schedules.addScheduleBetween(name, first, last);
+}
+
 pub fn runSchedulesFrom(self: *App, start: []const u8) !void {
     var schedule_iter = try self.schedules.iterator(start);
     defer schedule_iter.deinit();

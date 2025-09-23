@@ -121,6 +121,17 @@ pub fn scheduleAfter(self: *ScheduleManager, name: []const u8, other: []const u8
     _ = try self.graph.addEdge(b, a, {});
 }
 
+pub fn scheduleBetween(self: *ScheduleManager, name: []const u8, first: []const u8, last: []const u8) !void {
+    try self.scheduleAfter(name, first);
+    try self.scheduleBefore(name, last);
+}
+
+pub fn addScheduleBetween(self: *ScheduleManager, name: []const u8, first: []const u8, last: []const u8) !*Schedule {
+    const sched = try self.addSchedule(name);
+    try self.scheduleBetween(name, first, last);
+    return sched;
+}
+
 pub fn addSystem(self: *ScheduleManager, schedule_name: []const u8, comptime system_fn: anytype) !void {
     const node = self.name_to_node.get(schedule_name) orelse return Error.ScheduleNotFound;
     const id = self.graph.getNodeWeight(node);
