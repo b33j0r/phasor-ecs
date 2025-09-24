@@ -77,6 +77,10 @@ fn make(plugin_ptr: anytype, allocator: std.mem.Allocator, owned: bool) Plugin {
         fn destroyNoop(_: std.mem.Allocator, _: *anyopaque) void {}
     };
 
+    if (!@hasDecl(T, "build") and !@hasDecl(T, "cleanup")) {
+        @compileError("Plugin type " ++ @typeName(T) ++ " must implement at least one of build or cleanup methods");
+    }
+
     const vtable = VTable{
         .build = if (@hasDecl(T, "build")) &wrappers.build else null,
         .cleanup = if (@hasDecl(T, "cleanup")) &wrappers.cleanup else null,
