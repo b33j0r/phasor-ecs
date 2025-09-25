@@ -179,3 +179,8 @@ pub fn removeResource(self: *App, comptime T: type) bool {
 pub fn registerEvent(self: *App, comptime T: type, capacity: usize) !void {
     try self.world.registerEvent(T, capacity);
 }
+
+/// Registers an actor.
+pub fn addActor(self: *App, actor: anytype) !void {
+    // TODO
+}

@@ -7,6 +7,11 @@ pub const graph = @import("phasor-graph");
 pub const App = @import("App.zig");
 pub const Exit = App.Exit;
 
+pub const actor_mod = @import("actor.zig");
+pub const Actor = actor_mod.Actor;
+pub const ActorInbox = actor_mod.ActorInbox;
+pub const ActorOutbox = actor_mod.ActorOutbox;
+
 pub const CommandBuffer = @import("CommandBuffer.zig");
 pub const Command = @import("Command.zig");
 pub const Plugin = @import("Plugin.zig");
