@@ -1,6 +1,7 @@
-# phasor-ecs
+![phasor.svg](phasor.svg)
 
-A flexible Entity Component System (ECS) framework for Zig applications, with a focus on game development.
+A flexible Entity Component System (ECS) framework for Zig applications, with a focus on game development. Inspired by the
+ergonomics of [Bevy](https://bevy.org/).
 
 `phasor-ecs` provides a structured way to organize your game or application logic using the ECS architectural pattern. It is built on top of
 `phasor-db` (entity-component database) and `phasor-graph` (graph library for dependency resolution).
@@ -11,12 +12,11 @@ complete game engine, see `phasor` (not yet released).
 ## Features
 
 - **Entity Component System**: Organize your game data and logic with entities, components, and systems
-- **Flexible scheduling**: Define execution order with dependency-based schedules
+- **Flexible scheduling**: Define execution order with graph-based schedules
 - **Command system**: Safely modify entities and components from systems with deferred execution
 - **Resource management**: Global data access with type-safe resources
 - **Event system**: Communication between systems with event publishers and subscribers
 - **Plugin architecture**: Extend your application with modular, reusable plugins
-- **Phase system**: Manage game states with a structured phase transition system
 
 ## Installation
 
