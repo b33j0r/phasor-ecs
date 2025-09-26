@@ -3,27 +3,19 @@
 //! methods are also provided for non-blocking operations.
 
 const std = @import("std");
+const channel_mod = @import("phasor-channel");
 const root = @import("root.zig");
 const Commands = root.Commands;
 
 pub fn Events(comptime T: type) type {
     return struct {
         allocator: std.mem.Allocator,
-        // one ref for Sender, one for Receiver (clones retain/release)
-        ref_count: std.atomic.Value(usize) = std.atomic.Value(usize).init(2),
-
-        mutex: std.Thread.Mutex = .{},
-        not_full: std.Thread.Condition = .{},
-        not_empty: std.Thread.Condition = .{},
-
-        buf: []T,
         cap: usize,
-        head: usize = 0, // next pop
-        tail: usize = 0, // next push
-        len: usize = 0,
 
-        closed: bool = false,
+        sender: Channel.Sender,
+        receiver: Channel.Receiver,
 
+        const Channel = channel_mod.Channel(T);
         const Self = @This();
 
         pub const Error = error{
@@ -32,101 +24,52 @@ pub fn Events(comptime T: type) type {
         };
 
         pub fn init(allocator: std.mem.Allocator, capacity: usize) !Self {
-            return Self{
+            const channel_pair = try Channel.create(allocator, capacity);
+            return .{
                 .allocator = allocator,
-                .buf = allocator.alloc(T, capacity) catch return error.OutOfMemory,
                 .cap = capacity,
+                .sender = channel_pair.sender,
+                .receiver = channel_pair.receiver,
             };
         }
 
         pub fn deinit(self: *Self) void {
-            self.allocator.free(self.buf);
-            // No need to destroy condition/mutex: POD
-        }
-
-        inline fn isFull(self: *Self) bool {
-            return self.len == self.cap;
-        }
-        inline fn isEmpty(self: *Self) bool {
-            return self.len == 0;
-        }
-        inline fn pushAssumeLock(self: *Self, value: T) void {
-            self.buf[self.tail] = value;
-            self.tail = (self.tail + 1) % self.cap;
-            self.len += 1;
-        }
-        inline fn popAssumeLock(self: *Self) T {
-            const v = self.buf[self.head];
-            self.head = (self.head + 1) % self.cap;
-            self.len -= 1;
-            return v;
+            self.sender.deinit();
+            self.receiver.deinit();
         }
 
         /// Blocking send: waits while full unless closed.
         pub fn send(self: *Self, value: T) !void {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-
-            // Wait for space or close
-            while (self.isFull() and !self.closed) {
-                self.not_full.wait(&self.mutex);
-            }
-            if (self.closed) return Error.QueueClosed;
-
-            self.pushAssumeLock(value);
-            // Wake a waiting receiver
-            self.not_empty.signal();
+            self.sender.send(value) catch |err| switch (err) {
+                Channel.Error.Closed => return Error.QueueClosed,
+            };
         }
 
         /// Non-blocking send: error if full or closed.
         pub fn trySend(self: *Self, value: T) !void {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-
-            if (self.closed) return Error.QueueClosed;
-            if (self.isFull()) return Error.QueueFull;
-
-            self.pushAssumeLock(value);
-            self.not_empty.signal();
+            const sent = self.sender.trySend(value) catch |err| switch (err) {
+                Channel.Error.Closed => return Error.QueueClosed,
+            };
+            if (!sent) return Error.QueueFull;
         }
 
         /// Blocking recv: waits while empty unless closed (panics if closed+empty).
         /// Matches the given signature (no error return). Do not call after close/empty.
         pub fn recv(self: *Self) T {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-
-            while (self.isEmpty() and !self.closed) {
-                self.not_empty.wait(&self.mutex);
-            }
-            if (self.isEmpty() and self.closed) {
-                @panic("Events.recv called on closed and empty queue");
-            }
-            const v = self.popAssumeLock();
-            // Wake a waiting producer
-            self.not_full.signal();
-            return v;
+            return self.receiver.recv() catch |err| switch (err) {
+                Channel.Error.Closed => @panic("Events.recv called on closed and empty queue"),
+            };
         }
 
         /// Non-blocking recv: returns null if empty (closed or not).
         pub fn tryRecv(self: *Self) !?T {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-
-            if (self.isEmpty()) return null;
-
-            const v = self.popAssumeLock();
-            self.not_full.signal();
-            return v;
+            return self.receiver.tryRecv();
         }
 
         /// Optional helper to mark closed; wakes all waiters.
         pub fn close(self: *Self) void {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-            self.closed = true;
-            self.not_full.broadcast();
-            self.not_empty.broadcast();
+            self.sender.close();
+            self.receiver.close();
         }
     };
 }
