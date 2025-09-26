@@ -4,10 +4,6 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Add phasor-graph as a dependency
-    const phasor_graph_dep = b.dependency("phasor_graph", .{});
-    const phasor_graph_mod = phasor_graph_dep.module("phasor-graph");
-
     // Add phasor-db as a lib module
     const phasor_db_mod = b.addModule(
         "phasor-db",
@@ -29,6 +25,25 @@ pub fn build(b: *std.Build) void {
         .root_module = phasor_db_tests_mod,
     });
     const run_phasor_db_tests = b.addRunArtifact(phasor_db_tests);
+
+    // Add phasor-graph as a local module
+    const phasor_graph_mod = b.addModule("phasor-graph", .{
+        .root_source_file = b.path("lib/phasor-graph/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const phasor_graph_tests_mod = b.addModule("phasor_graph_tests", .{
+        .root_source_file = b.path("lib/phasor-graph/tests/tests.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "phasor-graph", .module = phasor_graph_mod },
+        },
+    });
+    const phasor_graph_tests = b.addTest(.{
+        .root_module = phasor_graph_tests_mod,
+    });
+    const run_phasor_graph_tests = b.addRunArtifact(phasor_graph_tests);
 
     // Add phasor-channel as a local module
     const phasor_channel_mod = b.addModule("phasor-channel", .{
@@ -72,6 +87,7 @@ pub fn build(b: *std.Build) void {
     });
     const run_phasor_actor_tests = b.addRunArtifact(phasor_actor_tests);
 
+    // The main phasor-ecs module (depends on phasor-db, phasor-actor, phasor-channel, phasor-graph)
     const phasor_ecs_mod = b.addModule("phasor-ecs", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -113,6 +129,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_phasor_db_tests.step);
     test_step.dependOn(&run_phasor_channel_tests.step);
     test_step.dependOn(&run_phasor_actor_tests.step);
+    test_step.dependOn(&run_phasor_graph_tests.step);
 
     // Example: rooms
     const rooms_example_mod = b.addModule("rooms_example", .{
