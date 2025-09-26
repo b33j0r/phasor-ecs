@@ -1,10 +1,3 @@
-const std = @import("std");
-const testing = std.testing;
-const root = @import("phasor-ecs");
-const ResourceManager = root.ResourceManager;
-const World = root.World;
-const resourceId = ResourceManager.resourceId;
-
 // Test resource types
 const ClearColor = struct {
     r: f32,
@@ -357,3 +350,12 @@ test "insertResource with ZST" {
     try testing.expect(removed);
     try testing.expect(!world.hasResource(GameMarker));
 }
+
+// Import
+const std = @import("std");
+const testing = std.testing;
+
+const ecs = @import("phasor-ecs");
+const ResourceManager = ecs.ResourceManager;
+const World = ecs.World;
+const resourceId = ResourceManager.resourceId;

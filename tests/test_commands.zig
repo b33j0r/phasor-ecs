@@ -1,10 +1,3 @@
-const std = @import("std");
-const ecs = @import("phasor-ecs");
-
-const Command = ecs.Command;
-const CommandBuffer = ecs.CommandBuffer;
-const Commands = ecs.Commands;
-
 const Foo = struct { x: i32 };
 
 // Test a simple command context that flips flags on execute/cleanup
@@ -296,3 +289,11 @@ test "Commands removeComponent (singular)" {
     const e = world.entities.getEntity(id) orelse unreachable;
     try std.testing.expect(e.get(Health) == null);
 }
+
+// Imports
+const std = @import("std");
+const ecs = @import("phasor-ecs");
+
+const Command = ecs.Command;
+const CommandBuffer = ecs.CommandBuffer;
+const Commands = ecs.Commands;

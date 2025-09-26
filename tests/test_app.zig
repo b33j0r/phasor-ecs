@@ -1,11 +1,3 @@
-const std = @import("std");
-const ecs = @import("phasor-ecs");
-const App = ecs.App;
-const Res = ecs.Res;
-const ResMut = ecs.ResMut;
-const ResOpt = ecs.ResOpt;
-const Scoped = ecs.Scoped;
-
 /// A simple recorder resource that logs events in order.
 const Recorder = struct {
     log: std.ArrayListUnmanaged([]const u8) = .empty,
@@ -241,3 +233,13 @@ test "App scoped commands" {
     defer other_query.deinit();
     try std.testing.expectEqual(@as(usize, 1), other_query.count());
 }
+
+// Imports
+const std = @import("std");
+
+const ecs = @import("phasor-ecs");
+const App = ecs.App;
+const Res = ecs.Res;
+const ResMut = ecs.ResMut;
+const ResOpt = ecs.ResOpt;
+const Scoped = ecs.Scoped;

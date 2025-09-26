@@ -1,17 +1,3 @@
-const std = @import("std");
-
-const root = @import("phasor-ecs");
-const Query = root.Query;
-const Res = root.Res;
-const ResMut = root.ResMut;
-const ResOpt = root.ResOpt;
-const Schedule = root.Schedule;
-const System = root.System;
-const Without = root.Without;
-const GroupBy = root.GroupBy;
-const World = root.World;
-const Commands = root.Commands;
-
 const Health = struct {
     current: i32,
     max: i32,
@@ -239,3 +225,18 @@ test "System with ResOpt(T) param" {
     try schedule.add(system_with_resopt_param_fn);
     try schedule.run(&world);
 }
+
+// Imports
+const std = @import("std");
+
+const ecs = @import("phasor-ecs");
+const Query = ecs.Query;
+const Res = ecs.Res;
+const ResMut = ecs.ResMut;
+const ResOpt = ecs.ResOpt;
+const Schedule = ecs.Schedule;
+const System = ecs.System;
+const Without = ecs.Without;
+const GroupBy = ecs.GroupBy;
+const World = ecs.World;
+const Commands = ecs.Commands;

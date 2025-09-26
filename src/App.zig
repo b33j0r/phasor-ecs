@@ -4,14 +4,6 @@ schedules: ScheduleManager,
 world: World,
 step_start_schedule_name: []const u8 = "BeginFrame",
 
-const std = @import("std");
-const root = @import("root.zig");
-const Plugin = root.Plugin;
-const ScheduleManager = root.ScheduleManager;
-const Schedule = root.Schedule;
-const World = root.World;
-const Events = root.Events;
-
 const App = @This();
 
 pub const Error = error{
@@ -179,3 +171,18 @@ pub fn removeResource(self: *App, comptime T: type) bool {
 pub fn registerEvent(self: *App, comptime T: type, capacity: usize) !void {
     try self.world.registerEvent(T, capacity);
 }
+
+pub fn subapp(allocator: std.mem.Allocator, comptime InboxT: type, comptime OutboxT: type) !SubApp(InboxT, OutboxT) {
+    return try SubApp(InboxT, OutboxT).init(allocator);
+}
+
+// Imports
+const std = @import("std");
+
+const root = @import("root.zig");
+const Plugin = root.Plugin;
+const ScheduleManager = root.ScheduleManager;
+const Schedule = root.Schedule;
+const World = root.World;
+const Events = root.Events;
+const SubApp = root.SubApp;

@@ -1,11 +1,4 @@
-const std = @import("std");
-const phasor = @import("phasor-ecs");
-const World = phasor.World;
-const Schedule = phasor.Schedule;
-const Events = phasor.Events;
-const EventWriter = phasor.EventWriter;
-const EventReader = phasor.EventReader;
-const Commands = phasor.Commands;
+
 
 test "World registerEvent adds Events(T) resource" {
     const alloc = std.testing.allocator;
@@ -107,3 +100,14 @@ test "EventWriter in one system, EventReader in another" {
 
     try sched.run(&world);
 }
+
+// Imports
+const std = @import("std");
+
+const ecs = @import("phasor-ecs");
+const World = ecs.World;
+const Schedule = ecs.Schedule;
+const Events = ecs.Events;
+const EventWriter = ecs.EventWriter;
+const EventReader = ecs.EventReader;
+const Commands = ecs.Commands;
