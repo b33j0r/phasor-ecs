@@ -16,6 +16,9 @@ pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
         app: ecs.App,
         thread: ?std.Thread = null,
         should_stop: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+        // Synchronization primitives for deterministic wake-up
+        mutex: std.Thread.Mutex = .{},
+        condition: std.Thread.Condition = .{},
 
         const Self = @This();
 
@@ -39,6 +42,11 @@ pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
 
             // Signal shutdown
             self.should_stop.store(true, .monotonic);
+
+            // Wake up the actor thread using condition variable
+            self.mutex.lock();
+            self.condition.signal();
+            self.mutex.unlock();
 
             // Close the inbox to wake up any blocking recv()
             if (self.app.getResource(LinkedEvents(InboxT, OutboxT))) |linked| {
@@ -72,8 +80,13 @@ pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
                     break;
                 }
 
-                // Sleep briefly to prevent busy-waiting and allow other threads to run
-                std.Thread.sleep(1_000_000); // Sleep for 1ms
+                // Use condition variable with timeout for deterministic wake-up
+                // This replaces the non-deterministic sleep-based polling
+                self.mutex.lock();
+                defer self.mutex.unlock();
+
+                // Wait for up to 1us or until signaled by stop()
+                _ = self.condition.timedWait(&self.mutex, 1_000_000) catch {};
             }
         }
 
