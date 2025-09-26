@@ -12,6 +12,8 @@ pub const Actor = actor_mod.Actor;
 pub const ActorInbox = actor_mod.ActorInbox;
 pub const ActorOutbox = actor_mod.ActorOutbox;
 
+pub const ActorManager = @import("ActorManager.zig");
+
 pub const CommandBuffer = @import("CommandBuffer.zig");
 pub const Command = @import("Command.zig");
 pub const Plugin = @import("Plugin.zig");
@@ -25,6 +27,7 @@ const events = @import("events.zig");
 pub const Events = events.Events;
 pub const EventReader = events.EventReader;
 pub const EventWriter = events.EventWriter;
+pub const LinkedEvents = events.LinkedEvents;
 
 pub const Commands = @import("Commands.zig");
 pub const Scoped = Commands.Scoped;

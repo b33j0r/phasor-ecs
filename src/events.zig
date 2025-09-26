@@ -176,3 +176,37 @@ pub fn EventReader(comptime T: type) type {
         }
     };
 }
+
+/// `LinkedEvents(InboxT, OutboxT)` is a proxy resource that flips the roles
+/// of inbox and outbox for an actor. It provides an `EventWriter` for the
+/// actor's outbox type and an `EventReader` for the actor's inbox type,
+/// allowing the actor to send events to the parent app and receive events
+/// from the parent app.
+///
+/// The parent app has the opposite: an `EventWriter` for the actor's inbox
+/// type and an `EventReader` for the actor's outbox type. This allows us to
+/// just use an Events(T) resource in the parent app, and this LinkedEvents
+/// resource in the actor, without needing separate event queues.
+pub fn LinkedEvents(comptime InboxT: type, comptime OutboxT: type) type {
+    return struct {
+        inbox: *Events(InboxT),
+        outbox: *Events(OutboxT),
+
+        const Self = @This();
+
+        pub fn init(
+            inbox: *Events(InboxT),
+            outbox: *Events(OutboxT),
+        ) Self {
+            return .{ .inbox = inbox, .outbox = outbox };
+        }
+
+        pub fn reader(self: *Self) EventReader(InboxT) {
+            return .{ .events = self.inbox };
+        }
+
+        pub fn writer(self: *Self) EventWriter(OutboxT) {
+            return .{ .events = self.outbox };
+        }
+    };
+}

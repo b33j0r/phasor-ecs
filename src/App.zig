@@ -1,11 +1,13 @@
 allocator: std.mem.Allocator,
 plugins: std.ArrayListUnmanaged(Plugin) = .empty,
+actors: ActorManager,
 schedules: ScheduleManager,
 world: World,
 step_start_schedule_name: []const u8 = "BeginFrame",
 
 const std = @import("std");
 const root = @import("root.zig");
+const ActorManager = root.ActorManager;
 const Plugin = root.Plugin;
 const ScheduleManager = root.ScheduleManager;
 const Schedule = root.Schedule;
@@ -53,9 +55,10 @@ pub fn default(allocator: std.mem.Allocator) !App {
     return app;
 }
 
-pub fn init(allocator: std.mem.Allocator) App {
+fn init(allocator: std.mem.Allocator) App {
     return App{
         .allocator = allocator,
+        .actors = ActorManager.init(allocator),
         .plugins = .empty,
         .schedules = ScheduleManager.init(allocator),
         .world = World.init(allocator),
@@ -69,6 +72,9 @@ pub fn deinit(self: *App) void {
         plugin.deinit();
     }
     self.plugins.deinit(self.allocator);
+
+    // Deinitialize actors
+    self.actors.deinit();
 
     // Deinitialize schedules and database
     self.schedules.deinit();
@@ -181,6 +187,32 @@ pub fn registerEvent(self: *App, comptime T: type, capacity: usize) !void {
 }
 
 /// Registers an actor.
-pub fn addActor(self: *App, actor: anytype) !void {
-    // TODO
+pub fn addActor(self: *App, name: []const u8, actor: anytype) !void {
+    const ActorType = @TypeOf(actor.*);
+    const InboxT = ActorType.Inbox;
+    const OutboxT = ActorType.Outbox;
+    
+    // Register event types in the main app
+    try self.registerEvent(InboxT, 32);
+    try self.registerEvent(OutboxT, 32);
+    
+    // Get the event resources
+    const inbox_events = self.getResource(Events(InboxT)) orelse return error.EventRegistrationFailed;
+    const outbox_events = self.getResource(Events(OutboxT)) orelse return error.EventRegistrationFailed;
+    
+    // Create LinkedEvents resource for the actor
+    const LinkedEventsT = root.LinkedEvents(InboxT, OutboxT);
+    const linked = LinkedEventsT.init(inbox_events, outbox_events);
+    try actor.app.insertResource(linked);
+    
+    // Start the actor thread
+    try actor.start();
+    
+    // Register with ActorManager for shutdown handling
+    const handle = ActorManager.ActorHandle{
+        .name = name,
+        .ptr = actor,
+        .stop_fn = @ptrCast(&ActorType.stop),
+    };
+    try self.actors.actors.put(self.allocator, name, handle);
 }

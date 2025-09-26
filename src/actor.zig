@@ -8,26 +8,126 @@ const Commands = ecs.Commands;
 const Events = ecs.Events;
 const EventReader = ecs.EventReader;
 const EventWriter = ecs.EventWriter;
+const LinkedEvents = ecs.LinkedEvents;
 
+/// Defines a sub-application with its own ECS `App`, typed with Inbox/Outbox.
 pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
     return struct {
         app: ecs.App,
+        thread: ?std.Thread = null,
+        should_stop: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
 
         const Self = @This();
 
         pub const Inbox = InboxT;
         pub const Outbox = OutboxT;
 
-        pub fn init(allocator: std.mem.Allocator) Self {
-            return .{ .app = ecs.App.init(allocator) };
+        pub fn init(allocator: std.mem.Allocator) !Self {
+            const app = try ecs.App.default(allocator);
+            return .{ .app = app };
+        }
+
+        pub fn start(self: *Self) !void {
+            if (self.thread != null) return; // Already running
+
+            self.should_stop.store(false, .monotonic);
+            self.thread = try std.Thread.spawn(.{}, Self.runActor, .{self});
+        }
+
+        pub fn stop(self: *Self) void {
+            if (self.thread == null) return; // Not running
+
+            // Signal shutdown
+            self.should_stop.store(true, .monotonic);
+
+            // Close the inbox to wake up any blocking recv()
+            if (self.app.getResource(LinkedEvents(InboxT, OutboxT))) |linked| {
+                linked.inbox.close();
+            }
+
+            // Wait for thread to finish
+            if (self.thread) |thread| {
+                thread.join();
+                self.thread = null;
+            }
+        }
+
+        fn runActor(self: *Self) void {
+            // Run the actor's app until shutdown is requested
+            while (!self.should_stop.load(.monotonic)) {
+                // Only run app.step() if we're not being asked to stop
+                if (!self.should_stop.load(.monotonic)) {
+                    if (self.app.step()) |maybe_exit| {
+                        if (maybe_exit) |exit| {
+                            _ = exit; // Actor finished normally
+                            break;
+                        }
+                    } else |_| {
+                        // TODO: Error occurred
+                    }
+                }
+
+                // Always check should_stop flag after any operations
+                if (self.should_stop.load(.monotonic)) {
+                    break;
+                }
+
+                // Sleep briefly to prevent busy-waiting and allow other threads to run
+                std.Thread.sleep(1_000_000); // Sleep for 1ms
+            }
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.stop(); // Ensure thread is stopped
+            self.app.deinit();
         }
     };
 }
 
-pub fn ActorInbox(comptime T: type) type {
-    // TODO
+pub fn ActorInbox(comptime InboxT: type, comptime OutboxT: type) type {
+    return struct {
+        link: ?*LinkedEvents(InboxT, OutboxT) = null,
+
+        const Self = @This();
+
+        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+            self.link = commands.getResource(LinkedEvents(InboxT, OutboxT));
+            if (self.link == null) return error.EventMustBeRegistered;
+        }
+
+        pub fn next(self: Self) ?InboxT {
+            if (self.link == null) return null;
+            var reader = self.link.?.reader();
+
+            // Use non-blocking tryRecv() to avoid infinite blocking
+            // This will return null if no message is available
+            const result = reader.tryRecv() catch null;
+            return result;
+        }
+    };
 }
 
-pub fn ActorOutbox(comptime T: type) type {
-    // TODO
+pub fn ActorOutbox(comptime InboxT: type, comptime OutboxT: type) type {
+    return struct {
+        link: ?*LinkedEvents(InboxT, OutboxT) = null,
+
+        const Self = @This();
+
+        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+            self.link = commands.getResource(LinkedEvents(InboxT, OutboxT));
+            if (self.link == null) return error.EventMustBeRegistered;
+        }
+
+        pub fn send(self: Self, event: OutboxT) !void {
+            if (self.link == null) return error.EventNotInitialized;
+            var writer = self.link.?.writer();
+            try writer.trySend(event);
+        }
+
+        pub fn trySend(self: Self, event: OutboxT) !void {
+            if (self.link == null) return error.EventNotInitialized;
+            var writer = self.link.?.writer();
+            try writer.trySend(event);
+        }
+    };
 }

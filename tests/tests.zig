@@ -7,6 +7,10 @@ pub const test_schedules = @import("test_schedules.zig");
 
 const Self = @This();
 
+pub const std_options: std.Options = .{
+    .log_level = .debug,
+};
+
 test "Import tests" {
     _ = Self.test_actor;
     _ = Self.test_app;
@@ -15,3 +19,5 @@ test "Import tests" {
     _ = Self.test_resources;
     _ = Self.test_schedules;
 }
+
+const std = @import("std");
