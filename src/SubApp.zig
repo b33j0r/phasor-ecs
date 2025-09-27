@@ -381,6 +381,10 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
             }
         }
 
+        pub fn addPlugin(self: *Self, plugin: anytype) !void {
+            try self.app.addPlugin(plugin);
+        }
+
         pub fn addSystem(self: *Self, schedule_name: []const u8, comptime system_fn: anytype) !void {
             try self.app.addSystem(schedule_name, system_fn);
         }
