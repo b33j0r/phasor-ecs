@@ -130,21 +130,4 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_phasor_channel_tests.step);
     test_step.dependOn(&run_phasor_actor_tests.step);
     test_step.dependOn(&run_phasor_graph_tests.step);
-
-    // Example: rooms
-    const rooms_example_mod = b.addModule("rooms_example", .{
-        .root_source_file = b.path("examples/rooms/main.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "phasor-ecs", .module = phasor_ecs_mod },
-        },
-    });
-    const rooms_example = b.addExecutable(.{
-        .name = "examples_rooms",
-        .root_module = rooms_example_mod,
-    });
-    const run_rooms = b.addRunArtifact(rooms_example);
-    const examples_rooms_step = b.step("examples-rooms", "Build and run the rooms example");
-    examples_rooms_step.dependOn(&run_rooms.step);
 }
