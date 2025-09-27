@@ -1,19 +1,4 @@
 test "Bundle Entity.get works with arbitrary structs" {
-    const Position = struct {
-        x: f32,
-        y: f32,
-    };
-
-    const Velocity = struct {
-        dx: f32,
-        dy: f32,
-    };
-
-    const Movable = struct {
-        pos: Position,
-        vel: Velocity,
-    };
-
     const allocator = std.testing.allocator;
     var db = phasor_db.Database.init(allocator);
     defer db.deinit();
@@ -37,5 +22,31 @@ test "Bundle Entity.get works with arbitrary structs" {
     try std.testing.expect(movable.vel.dy == 0.5);
 }
 
+test "Bundle Entity.getAlloc fails if any component is missing" {
+    const allocator = std.testing.allocator;
+    var db = phasor_db.Database.init(allocator);
+    defer db.deinit();
+
+    const entity_id = try db.createEntity(.{
+        Position{ .x = 1.0, .y = 2.0 },
+        // Note: Velocity component is omitted
+    });
+    const entity = db.getEntity(entity_id) orelse {
+        return error.EntityNotFound;
+    };
+    const owned_movable = entity.getAlloc(allocator, Movable);
+    try std.testing.expect(owned_movable == null);
+}
+
+// -------
+// Imports
+// -------
+
 const std = @import("std");
+
 const phasor_db = @import("phasor-db");
+
+const fixtures = @import("fixtures.zig");
+const Position = fixtures.Position;
+const Velocity = fixtures.Velocity;
+const Movable = fixtures.Moveable;
