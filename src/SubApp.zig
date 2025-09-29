@@ -236,6 +236,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
         pub const Options = struct {
             inbox_capacity: usize = 64,
             outbox_capacity: usize = 64,
+            inline_mode: bool = false, // If true, runs nested SubApps inline instead of spawning threads
         };
 
         pub const Error = error{
@@ -262,8 +263,13 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
         }
 
         pub fn stop(self: *Self) void {
+            // Signal shutdown using atomic flag and Exit resource
+            self.stop_flag.store(true, .release);
+
+            // Insert Exit resource to break the app.step() loop
+            self.app.insertResource(root.Exit{ .code = 0 }) catch {};
+
             if (self.handle) |*handle| {
-                self.stop_flag.store(true, .release);
                 if (self.parent) |parent_app| {
                     _ = parent_app.world.removeResource(ParentInboxResource(InboxT));
                     _ = parent_app.world.removeResource(ParentOutboxResource(OutboxT));
@@ -336,7 +342,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
             self.handle = handle;
 
             while (!self.ready.load(.acquire)) {
-                std.Thread.yield() catch {};
+                std.Thread.sleep(50);
             }
 
             const err_code = self.worker_error.load(.acquire);
@@ -390,6 +396,11 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
             ran_prestartup = true;
 
             while (!self.stop_flag.load(.acquire)) {
+                // Check for Exit resource before stepping
+                if (self.app.world.getResource(root.Exit) != null) {
+                    break;
+                }
+
                 const exit_res = self.app.step() catch |err| {
                     self.recordWorkerError(err);
                     break;
@@ -398,6 +409,9 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
                 if (exit_res != null) {
                     break;
                 }
+
+                // Small yield to prevent busy waiting
+                std.Thread.yield() catch {};
             }
 
             if (ran_prestartup) {
@@ -445,6 +459,11 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
 
         pub fn world(self: *Self) *root.World {
             return &self.app.world;
+        }
+
+        /// Add a nested SubApp to this SubApp's internal App
+        pub fn addSubApp(self: *Self, subapp: anytype) !void {
+            try self.app.addSubApp(subapp);
         }
 
         /// Create a type-erased handle for lifecycle management
