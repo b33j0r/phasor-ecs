@@ -1,12 +1,6 @@
-const std = @import("std");
-
-// External channel module
-const channel_mod = @import("phasor-channel");
-const Channel = channel_mod.Channel;
-
 /// Errors you may see on the user side.
 pub const ActorError = error{
-    Stopped,
+    Stopped, // used here to mean "stop timed out; thread may still be running"
     InboxClosed,
     OutboxClosed,
     InboxSendFailed,
@@ -14,26 +8,12 @@ pub const ActorError = error{
     ChannelClosed,
 };
 
-/// Control wrapper for inbox messages (user -> actor thread)
-fn InboxMessage(comptime T: type) type {
-    return union(enum) {
-        message: T,
-        stop,
-    };
-}
-
-/// Status/message wrapper for outbox messages (actor thread -> user)
-fn OutboxMessage(comptime T: type) type {
-    return union(enum) {
-        message: T,
-        stopped,
-    };
-}
-
 /// Spawn options (capacities, etc.)
 pub const ActorOptions = struct {
     inbox_capacity: usize = 1024,
     outbox_capacity: usize = 1024,
+    /// Poll sleep in microseconds while waiting for messages or stop.
+    poll_sleep_us: u64 = 200, // small but non-zero to avoid busy spin
 };
 
 /// Actor(InboxT, OutboxT) => type that can spawn a worker thread which:
@@ -41,11 +21,11 @@ pub const ActorOptions = struct {
 /// - lets your worker write OutboxT back via `Outbox`
 ///
 /// Worker contract:
-///   pub fn step(ctx: *@This(), cmd: *InboxT, outbox: *DoublerActor.Outbox) void
+///   pub fn step(ctx: *@This(), cmd: *InboxT, outbox: *Outbox) void
 ///
 /// Lifecycle (user side):
 ///   - `send(cmd)` to enqueue work
-///   - `recv()` to get responses (blocks until a OutboxT arrives)
+///   - `recv()` / `tryRecv()` to read responses
 ///   - `waitForStop(ms)` to request a graceful stop and join the thread
 ///
 /// IMPORTANT: The actor **borrows** the worker context. The caller must keep the
@@ -55,12 +35,9 @@ pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
         allocator: std.mem.Allocator,
 
         const Self = @This();
-
-        const InternalInboxT = InboxMessage(InboxT);
-        const InternalOutboxT = OutboxMessage(OutboxT);
-
-        const InboxChannel = Channel(InternalInboxT);
-        const OutboxChannel = Channel(InternalOutboxT);
+        const InboxChannel = Channel(InboxT);
+        const OutboxChannel = Channel(OutboxT);
+        const BoolSignal = Signal(bool);
 
         // An interface for sending to the outbox from inside a `step` function.
         pub const Outbox = struct {
@@ -68,13 +45,28 @@ pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
 
             /// Send a message to the outbox (actor -> user).
             pub fn send(self: *Outbox, msg: OutboxT) !void {
-                self.internal_outbox.send(.{ .message = msg }) catch {
+                self.internal_outbox.send(msg) catch {
                     return ActorError.OutboxSendFailed;
                 };
             }
         };
 
-        /// User handle: endpoints + thread.
+        // An interface for receiving from the inbox inside the worker.
+        pub const Inbox = struct {
+            internal_inbox: *InboxChannel.Receiver,
+
+            /// Blocking receive of an `InboxT`.
+            pub fn recv(self: *Inbox) !InboxT {
+                return self.internal_inbox.recv();
+            }
+
+            /// Non-blocking receive of an `InboxT`.
+            pub fn tryRecv(self: *Inbox) !?InboxT {
+                return self.internal_inbox.tryRecv();
+            }
+        };
+
+        /// User handle: endpoints + thread + signals.
         pub const Handle = struct {
             allocator: std.mem.Allocator,
 
@@ -85,75 +77,66 @@ pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
             // thread
             thread: std.Thread,
 
+            // signals
+            shutdown: BoolSignal,
+            stopped: BoolSignal,
+
+            opts: ActorOptions,
+
             /// Send a command to the actor.
-            pub fn send(self: *Handle, cmd: InboxT) !void {
-                self.inbox.send(.{ .message = cmd }) catch {
+            pub fn send(self: *Handle, msg: InboxT) !void {
+                self.inbox.send(msg) catch {
                     return ActorError.InboxSendFailed;
                 };
             }
 
-            /// Blocking receive of a `OutboxT`.
-            /// Skips `.stopped` notices so you can drain replies first.
-            /// Panics if outbox closes without a message (programming error in happy path).
+            /// Blocking receive of an `OutboxT`.
             pub fn recv(self: *Handle) !OutboxT {
-                while (true) {
-                    const next = self.outbox.next() orelse {
-                        return ActorError.OutboxClosed;
-                    };
-                    switch (next) {
-                        .message => |m| return m,
-                        .stopped => {
-                            return ActorError.Stopped;
-                        },
-                    }
-                }
+                return self.outbox.recv();
             }
 
-            /// Ask the actor to stop and (best-effort) wait for it to acknowledge.
-            /// Sends `.stop`, waits up to `timeout_ms` for `.stopped`, then joins.
-            /// Regardless of timeout, we join and close/deinit the endpoints.
+            /// Non-blocking receive of an `OutboxT`.
+            pub fn tryRecv(self: *Handle) !?OutboxT {
+                return self.outbox.tryRecv();
+            }
+
+            /// Ask the actor to stop and (best-effort) wait for it to exit.
+            /// Sets the shutdown flag and waits up to `timeout_ms`.
+            /// If it exits in time, joins the thread and returns.
+            /// If not, returns `error.Stopped` (thread may still be running).
             pub fn waitForStop(self: *Handle, timeout_ms: u64) !void {
-                // Best-effort: if the inbox is already closed, just proceed to join
-                _ = self.inbox.send(.{ .stop = {} }) catch {};
+                // Request shutdown
+                self.shutdown.set(true);
 
-                const start_ms = std.time.milliTimestamp();
-                var saw_stopped = false;
+                const start_ns = std.time.nanoTimestamp();
+                const budget_ns: i128 = @as(i128, @intCast(timeout_ms)) * std.time.ns_per_ms;
 
-                while (true) {
-                    if (timeout_ms > 0) {
-                        const now = std.time.milliTimestamp();
-                        if (now - start_ms > timeout_ms) {
-                            break;
-                        }
+                // Poll the stopped signal
+                while (!self.stopped.get()) {
+                    // Time check
+                    const elapsed = std.time.nanoTimestamp() - start_ns;
+                    if (elapsed >= budget_ns) {
+                        return ActorError.Stopped; // timeout; do not join
                     }
-
-                    if (self.outbox.next()) |msg| {
-                        switch (msg) {
-                            .message => {
-                                // Late reply racing with stop; ignore during shutdown
-                            },
-                            .stopped => {
-                                saw_stopped = true;
-                                break;
-                            },
-                        }
-                    } else {
-                        // Outbox closed without explicit `.stopped`—proceed
-                        break;
-                    }
-
-                    // Small yield to avoid busy spin if worker is unwinding
-                    std.Thread.sleep(200_000); // 0.2 ms
+                    // brief sleep to yield CPU
+                    std.Thread.sleep(self.opts.poll_sleep_us * 1000);
                 }
 
-                // Join worker thread (no matter what)
+                // The worker flipped stopped=true; now we can safely join
                 self.thread.join();
+            }
 
-                // Close + deinit user endpoints
+            /// Clean up user endpoints and signals (does not auto-stop).
+            pub fn deinit(self: *Handle) void {
+                // Close user endpoints
                 self.inbox.close();
                 self.outbox.close();
                 self.inbox.deinit();
                 self.outbox.deinit();
+
+                // Drop signals
+                self.shutdown.deinit();
+                self.stopped.deinit();
             }
         };
 
@@ -189,11 +172,21 @@ pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
                 out_pair.receiver.deinit();
             }
 
+            // Signals
+            var shutdown_sig = try BoolSignal.init(self.allocator, false);
+            errdefer shutdown_sig.deinit();
+
+            var stopped_sig = try BoolSignal.init(self.allocator, false);
+            errdefer stopped_sig.deinit();
+
             // Start thread
             const th = try std.Thread.spawn(.{}, workerMain(ContextT), .{
                 context_ptr,
                 in_pair.receiver,
                 out_pair.sender,
+                shutdown_sig.clone(), // pass clones to thread
+                stopped_sig.clone(),
+                options,
             });
 
             return .{
@@ -201,47 +194,59 @@ pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
                 .inbox = in_pair.sender,
                 .outbox = out_pair.receiver,
                 .thread = th,
+                .shutdown = shutdown_sig,
+                .stopped = stopped_sig,
+                .opts = options,
             };
         }
 
         /// Per-ContextT worker main, so we can call ctx.step without runtime anytype.
-        fn workerMain(comptime ContextT: type) fn (*ContextT, InboxChannel.Receiver, OutboxChannel.Sender) void {
+        fn workerMain(comptime ContextT: type) fn (*ContextT, InboxChannel.Receiver, OutboxChannel.Sender, BoolSignal, BoolSignal, ActorOptions) void {
             return struct {
                 fn run(
                     ctx: *ContextT,
-                    inbox_recv: Channel(InternalInboxT).Receiver,
-                    outbox_send: Channel(InternalOutboxT).Sender,
+                    inbox_recv: InboxChannel.Receiver,
+                    outbox_send: OutboxChannel.Sender,
+                    shutdown: BoolSignal,
+                    stopped: BoolSignal,
+                    opts: ActorOptions,
                 ) void {
+                    _ = opts;
+
                     var inbox_receiver = @constCast(&inbox_recv);
                     var outbox_sender = @constCast(&outbox_send);
                     var outbox = Outbox{ .internal_outbox = outbox_sender };
+                    var inbox = Inbox{ .internal_inbox = inbox_receiver };
 
-                    // Dispatch loop
-                    while (inbox_receiver.next()) |msg| {
-                        switch (msg) {
-                            .message => |m| {
-                                ContextT.step(ctx, &m, &outbox);
-                            },
-                            .stop => {
-                                break;
-                            },
-                        }
-                    }
+                    ctx.work(&inbox, &outbox, shutdown, stopped) catch |err| {
+                        std.debug.print("Actor worker error: {s}\n", .{@errorName(err)});
+                    };
 
-                    // Stop receiving messages
+                    // Finish: close recv/send from worker side
                     inbox_receiver.close();
-
-                    // Send the stopped message
-                    _ = outbox_sender.send(.{ .stopped = {} }) catch {};
-
-                    // Close the outbox
                     outbox_sender.close();
 
                     // Deinit thread-owned endpoints
                     inbox_receiver.deinit();
                     outbox_sender.deinit();
+
+                    // Mark stopped so Handle.waitForStop() can join
+                    stopped.set(true);
+
+                    // Drop the thread's clones of signals
+                    shutdown.deinit();
+                    stopped.deinit();
                 }
             }.run;
         }
     };
 }
+
+// Imports
+const std = @import("std");
+
+const channel_mod = @import("phasor-channel");
+const Channel = channel_mod.Channel;
+
+const signal_mod = @import("signal.zig");
+const Signal = signal_mod.Signal;

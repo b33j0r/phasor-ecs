@@ -3,8 +3,9 @@ const std = @import("std");
 const channel_mod = @import("phasor-channel");
 const Channel = channel_mod.Channel;
 
-const actor_mod = @import("phasor-actor");
-const Actor = actor_mod.Actor;
+const phasor_actor = @import("phasor-actor");
+const Actor = phasor_actor.Actor;
+const Signal = phasor_actor.Signal;
 
 test "Actor: doubler" {
     const Command = struct {
@@ -18,10 +19,27 @@ test "Actor: doubler" {
     const DoublerActor = Actor(Command, Response);
 
     const Worker = struct {
-        pub fn step(_: *@This(), cmd: *const Command, outbox: *DoublerActor.Outbox) void {
-            outbox.send(Response{ .value = cmd.value * 2 }) catch {
-                std.log.err("DoublerActor outbox closed", .{});
-            };
+        pub fn work(
+            _: *@This(),
+            inbox: *DoublerActor.Inbox,
+            outbox: *DoublerActor.Outbox,
+            stop_signal: Signal(bool),
+            stopped_signal: Signal(bool),
+        ) !void {
+            while (!stop_signal.get()) {
+                // Try to receive a command
+                if (try inbox.tryRecv()) |cmd| {
+                    // Process the command
+                    const result = cmd.value * 2;
+                    // Send the response
+                    try outbox.send(Response{ .value = result });
+                    continue;
+                } else {
+                    std.Thread.sleep(1);
+                    continue;
+                }
+            }
+            stopped_signal.set(true);
         }
     };
 
@@ -36,6 +54,7 @@ test "Actor: doubler" {
             .outbox_capacity = 4,
         },
     );
+    defer actor.deinit();
 
     // Send commands
     try actor.send(.{ .value = 10 });
