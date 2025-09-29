@@ -3,7 +3,8 @@
 //! methods are also provided for non-blocking operations.
 
 const std = @import("std");
-const channel_mod = @import("phasor-channel");
+const phasor_channel = @import("phasor-channel");
+
 const root = @import("root.zig");
 const Commands = root.Commands;
 
@@ -15,7 +16,7 @@ pub fn Events(comptime T: type) type {
         sender: Channel.Sender,
         receiver: Channel.Receiver,
 
-        const Channel = channel_mod.Channel(T);
+        const Channel = phasor_channel.Channel(T);
         const Self = @This();
 
         pub const Error = error{

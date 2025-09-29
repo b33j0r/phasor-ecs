@@ -95,7 +95,6 @@ test "SubApp forwards commands across thread boundary (precise payloads, order)"
 
 // =====================================================================================
 // Test 1: Nested SubApps — Producer (leaf) ↔ Middleman (nested) ↔ Consumer (main)
-//       Give each link its own T to avoid type re-use collisions
 // =====================================================================================
 
 // Consumer → Middleman

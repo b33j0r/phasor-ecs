@@ -65,7 +65,9 @@ pub fn init(allocator: std.mem.Allocator) App {
 pub fn deinit(self: *App) void {
     // First stop all subapps to prevent use-after-free during cleanup
     for (self.subapps.items) |*subapp_handle| {
-        subapp_handle.stop();
+        subapp_handle.waitForStop(1_000_000_000) catch {
+            std.log.err("Timed out waiting for subapp to stop during App deinit", .{});
+        };
     }
     // Then deinit them
     for (self.subapps.items) |*subapp_handle| {

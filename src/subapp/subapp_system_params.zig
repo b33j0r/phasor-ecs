@@ -2,6 +2,11 @@
 pub fn InboxSender(comptime InboxT: type) type {
     return struct {
         const Self = @This();
+        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+            _ = self;
+            _ = commands;
+            return error.NotImplemented;
+        }
         pub fn send(self: *Self, msg: InboxT) !void {
             _ = self;
             _ = msg;
@@ -41,3 +46,9 @@ pub fn OutboxSender(comptime OutboxT: type) type {
         }
     };
 }
+
+// Imports
+const std = @import("std");
+
+const root = @import("../root.zig");
+const Commands = root.Commands;

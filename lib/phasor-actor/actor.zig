@@ -35,8 +35,8 @@ pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
         allocator: std.mem.Allocator,
 
         const Self = @This();
-        const InboxChannel = Channel(InboxT);
-        const OutboxChannel = Channel(OutboxT);
+        pub const InboxChannel = Channel(InboxT);
+        pub const OutboxChannel = Channel(OutboxT);
         const BoolSignal = Signal(bool);
 
         // An interface for sending to the outbox from inside a `step` function.

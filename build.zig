@@ -47,7 +47,7 @@ pub fn build(b: *std.Build) void {
 
     // Add phasor-channel as a local module
     const phasor_channel_mod = b.addModule("phasor-channel", .{
-        .root_source_file = b.path("lib/phasor-channel/channel.zig"),
+        .root_source_file = b.path("lib/phasor-channel/root.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -66,7 +66,7 @@ pub fn build(b: *std.Build) void {
 
     // Add phasor-actor as a local module (depends on phasor-channel)
     const phasor_actor_mod = b.addModule("phasor-actor", .{
-        .root_source_file = b.path("lib/phasor-actor/actor.zig"),
+        .root_source_file = b.path("lib/phasor-actor/root.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
