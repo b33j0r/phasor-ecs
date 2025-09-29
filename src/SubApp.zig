@@ -9,6 +9,26 @@ const phasor_channel = @import("phasor-channel");
 
 const ChannelError = error{MissingSubAppResource};
 
+/// Type-erased handle for managing SubApp lifecycle
+pub const SubAppHandle = struct {
+    ptr: *anyopaque,
+    startFn: *const fn (ptr: *anyopaque, parent_app: *App) anyerror!void,
+    stopFn: *const fn (ptr: *anyopaque) void,
+    deinitFn: *const fn (ptr: *anyopaque) void,
+
+    pub fn start(self: SubAppHandle, parent_app: *App) !void {
+        try self.startFn(self.ptr, parent_app);
+    }
+
+    pub fn stop(self: SubAppHandle) void {
+        self.stopFn(self.ptr);
+    }
+
+    pub fn deinit(self: SubAppHandle) void {
+        self.deinitFn(self.ptr);
+    }
+};
+
 /// Wrapper type to expose the parent-side sender for a subapp inbox as a
 /// system parameter.
 pub fn InboxSender(comptime InboxT: type) type {
@@ -207,6 +227,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
         handle: ?ActorType.ActorHandle = null,
         context: Context = undefined,
         parent: ?*App = null,
+        options: Options,
         ready: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
         stop_flag: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
         worker_error: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
@@ -222,17 +243,22 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
             WorkerFailed,
         };
 
-        pub fn init(allocator: std.mem.Allocator) !Self {
+        pub fn init(allocator: std.mem.Allocator, options: Options) !Self {
             return Self{
                 .allocator = allocator,
                 .app = try App.default(allocator),
                 .actor = ActorType.init(allocator),
+                .options = options,
             };
         }
 
         pub fn deinit(self: *Self) void {
             self.stop();
-            self.app.deinit();
+            // Only deinit our app if we're not managed by a parent
+            // (parent App will handle cleanup of managed SubApps)
+            if (self.parent == null) {
+                self.app.deinit();
+            }
         }
 
         pub fn stop(self: *Self) void {
@@ -261,7 +287,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
             self.worker_done.store(false, .release);
         }
 
-        pub fn start(self: *Self, parent_app: *App, options: Options) !void {
+        pub fn start(self: *Self, parent_app: *App) !void {
             if (self.handle != null) {
                 return Error.AlreadyStarted;
             }
@@ -274,7 +300,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
 
             self.context = .{ .sub_app = self };
 
-            var handle = try self.actor.spawn(&self.context, options.inbox_capacity, options.outbox_capacity);
+            var handle = try self.actor.spawn(&self.context, self.options.inbox_capacity, self.options.outbox_capacity);
             errdefer {
                 handle.inbox.close();
                 handle.outbox.close();
@@ -419,6 +445,37 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
 
         pub fn world(self: *Self) *root.World {
             return &self.app.world;
+        }
+
+        /// Create a type-erased handle for lifecycle management
+        pub fn toHandle(self: *Self) SubAppHandle {
+            const startWrapper = struct {
+                fn start(ptr: *anyopaque, parent_app: *App) anyerror!void {
+                    const subapp: *Self = @ptrCast(@alignCast(ptr));
+                    return subapp.start(parent_app);
+                }
+            }.start;
+
+            const stopWrapper = struct {
+                fn stop(ptr: *anyopaque) void {
+                    const subapp: *Self = @ptrCast(@alignCast(ptr));
+                    subapp.stop();
+                }
+            }.stop;
+
+            const deinitWrapper = struct {
+                fn deinit(ptr: *anyopaque) void {
+                    const subapp: *Self = @ptrCast(@alignCast(ptr));
+                    subapp.deinit();
+                }
+            }.deinit;
+
+            return SubAppHandle{
+                .ptr = self,
+                .startFn = startWrapper,
+                .stopFn = stopWrapper,
+                .deinitFn = deinitWrapper,
+            };
         }
     };
 }

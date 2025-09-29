@@ -18,6 +18,7 @@ pub const World = @import("World.zig");
 
 const subapp_mod = @import("SubApp.zig");
 pub const SubApp = subapp_mod.SubApp;
+pub const SubAppHandle = subapp_mod.SubAppHandle;
 pub const InboxSender = subapp_mod.InboxSender;
 pub const OutboxReceiver = subapp_mod.OutboxReceiver;
 pub const InboxReceiver = subapp_mod.InboxReceiver;

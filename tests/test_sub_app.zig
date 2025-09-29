@@ -45,11 +45,14 @@ test "SubApp forwards commands across thread boundary" {
     var app = try App.default(allocator);
     defer app.deinit();
 
-    var subapp = try App.subapp(allocator, Command, Reply);
-    defer subapp.deinit();
+    var subapp = try ecs.SubApp(Command, Reply).init(allocator, .{
+        .inbox_capacity = 8,
+        .outbox_capacity = 8,
+    });
+    // Note: App will automatically handle SubApp cleanup via addSubApp()
 
     try subapp.addSystem("Update", processCommands);
-    try subapp.start(&app, .{ .inbox_capacity = 8, .outbox_capacity = 8 });
+    try app.addSubApp(&subapp);
 
     try app.insertResource(SendState{});
     try app.insertResource(ReplyLog{ .allocator = allocator });

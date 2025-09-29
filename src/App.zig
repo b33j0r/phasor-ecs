@@ -2,6 +2,7 @@ allocator: std.mem.Allocator,
 plugins: std.ArrayListUnmanaged(Plugin) = .empty,
 schedules: ScheduleManager,
 world: World,
+subapps: std.ArrayListUnmanaged(SubAppHandle) = .empty,
 step_start_schedule_name: []const u8 = "BeginFrame",
 
 const App = @This();
@@ -55,6 +56,13 @@ pub fn init(allocator: std.mem.Allocator) App {
 }
 
 pub fn deinit(self: *App) void {
+    // Stop and deinitialize all SubApps first
+    for (self.subapps.items) |subapp_handle| {
+        subapp_handle.stop();
+        subapp_handle.deinit();
+    }
+    self.subapps.deinit(self.allocator);
+
     // Call cleanup on all plugins, then destroy their instances
     for (self.plugins.items) |*plugin| {
         plugin.cleanup(self);
@@ -119,6 +127,13 @@ pub fn addScheduleBetween(self: *App, name: []const u8, first: []const u8, last:
 }
 
 pub fn runSchedulesFrom(self: *App, start: []const u8) !void {
+    // If starting from PreStartup, start all SubApps first
+    if (std.mem.eql(u8, start, "PreStartup")) {
+        for (self.subapps.items) |subapp_handle| {
+            try subapp_handle.start(self);
+        }
+    }
+    
     var schedule_iter = try self.schedules.iterator(start);
     defer schedule_iter.deinit();
     while (schedule_iter.next()) |schedule| {
@@ -172,9 +187,13 @@ pub fn registerEvent(self: *App, comptime T: type, capacity: usize) !void {
     try self.world.registerEvent(T, capacity);
 }
 
-pub fn subapp(allocator: std.mem.Allocator, comptime InboxT: type, comptime OutboxT: type) !SubApp(InboxT, OutboxT) {
-    return try SubApp(InboxT, OutboxT).init(allocator);
+/// Adds a SubApp to be managed by this App. SubApps will be started
+/// automatically during the PreStartup phase.
+pub fn addSubApp(self: *App, subapp: anytype) !void {
+    const handle = subapp.toHandle();
+    try self.subapps.append(self.allocator, handle);
 }
+
 
 // Imports
 const std = @import("std");
@@ -186,3 +205,4 @@ const Schedule = root.Schedule;
 const World = root.World;
 const Events = root.Events;
 const SubApp = root.SubApp;
+const SubAppHandle = root.SubAppHandle;
