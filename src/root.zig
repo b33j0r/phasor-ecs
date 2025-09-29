@@ -16,9 +16,9 @@ pub const ScheduleManager = @import("ScheduleManager.zig");
 pub const System = @import("System.zig");
 pub const World = @import("World.zig");
 
-const subapp_mod = @import("SubApp.zig");
+const subapp_mod = @import("subapp/subapp.zig");
 pub const SubApp = subapp_mod.SubApp;
-pub const SubAppHandle = subapp_mod.SubAppHandle;
+pub const SubAppLifecycle = subapp_mod.SubAppLifecycle;
 pub const InboxSender = subapp_mod.InboxSender;
 pub const OutboxReceiver = subapp_mod.OutboxReceiver;
 pub const InboxReceiver = subapp_mod.InboxReceiver;

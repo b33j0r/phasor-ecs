@@ -6,13 +6,13 @@ const ScheduleManager = root.ScheduleManager;
 const Schedule = root.Schedule;
 const World = root.World;
 const Events = root.Events;
-const SubAppHandle = root.SubAppHandle;
+const SubAppLifecycle = root.SubAppLifecycle;
 
 allocator: std.mem.Allocator,
 plugins: std.ArrayListUnmanaged(Plugin) = .empty,
 schedules: ScheduleManager,
 world: World,
-subapps: std.ArrayListUnmanaged(SubAppHandle) = .empty,
+subapps: std.ArrayListUnmanaged(SubAppLifecycle) = .empty,
 step_start_schedule_name: []const u8 = "BeginFrame",
 
 const App = @This();

@@ -15,13 +15,14 @@ fn stepUntil(app: *App, ns_budget: u64, max_steps: usize, predicate: fn (*App) b
     while (steps < max_steps and (std.time.nanoTimestamp() - start) < ns_budget) : (steps += 1) {
         _ = try app.step();
         if (predicate(app)) return true;
+        // tiny sleep to allow subapp threads to run without burning CPU
         std.Thread.sleep(500_000); // 0.5ms
     }
     return false;
 }
 
 // =====================================================================================
-// Test 0: SubApp round trip
+// Test 0: SubApp round trip (simple Command/Reply)
 // =====================================================================================
 
 const Command = enum { DoThingA, DoThingB };
@@ -90,87 +91,105 @@ test "SubApp forwards commands across thread boundary (precise payloads, order)"
         .Snarky => |msg| try std.testing.expectEqualStrings("sure", msg),
         else => try std.testing.expect(false),
     }
-
-    // App.deinit() will handle subapp cleanup automatically
 }
 
 // =====================================================================================
-// Test 1: Nested SubApps
+// Test 1: Nested SubApps — Producer (leaf) ↔ Middleman (nested) ↔ Consumer (main)
+//       Give each link its own T to avoid type re-use collisions
 // =====================================================================================
 
-const P3Msg = union(enum) { Ping: u32, Fwd: u32, Resp: u32, Pong: u32 };
-const P3State = struct { sent: u32 = 0, want: u32 = 0, got: u32 = 0 };
+// Consumer → Middleman
+const ConsumerToMiddle = union(enum) { Produce: u32 };
+// Middleman → Consumer
+const MiddleToConsumer = union(enum) { Done: u32 };
 
-fn p3_sender(state: ResMut(P3State), mid_in: InboxSender(P3Msg)) !void {
+// Middleman → Producer
+const MiddleToProducer = union(enum) { Work: u32 };
+// Producer → Middleman
+const ProducerToMiddle = union(enum) { Result: u32 };
+
+const PipelineState = struct { sent: u32 = 0, want: u32 = 0, got: u32 = 0 };
+
+fn consumer_send(state: ResMut(PipelineState), mid_in: InboxSender(ConsumerToMiddle)) !void {
     if (state.ptr.want == 0) {
         var i: u32 = 0;
         while (i < 64) : (i += 1) {
-            try mid_in.send(.{ .Ping = i });
+            try mid_in.send(.{ .Produce = i });
             state.ptr.sent += 1;
         }
         state.ptr.want = 64;
     }
 }
-fn p3_recv(state: ResMut(P3State), mid_out: OutboxReceiver(P3Msg)) !void {
+fn consumer_recv(state: ResMut(PipelineState), mid_out: OutboxReceiver(MiddleToConsumer)) !void {
     while (mid_out.tryRecv()) |m| switch (m) {
-        .Pong => |_| state.ptr.got += 1,
-        else => {},
-    };
-}
-fn middle_forward_down(inbox: InboxReceiver(P3Msg), leaf_in: InboxSender(P3Msg)) !void {
-    while (inbox.tryRecv()) |m| switch (m) {
-        .Ping => |v| try leaf_in.send(.{ .Fwd = v }),
-        else => {},
-    };
-}
-fn middle_forward_up(leaf_out: OutboxReceiver(P3Msg), outbox: OutboxSender(P3Msg)) !void {
-    while (leaf_out.tryRecv()) |m| switch (m) {
-        .Resp => |v| try outbox.send(.{ .Pong = v }),
-        else => {},
-    };
-}
-fn leaf_echo(inbox: InboxReceiver(P3Msg), outbox: OutboxSender(P3Msg)) !void {
-    while (inbox.tryRecv()) |m| switch (m) {
-        .Fwd => |v| try outbox.send(.{ .Resp = v }),
-        else => {},
+        .Done => |_| state.ptr.got += 1,
     };
 }
 
-test "Nested SubApps: App→Middle→Leaf ping flood" {
+// Middleman: forward down to Producer
+fn middle_forward_down(
+    inbox_from_consumer: InboxReceiver(ConsumerToMiddle),
+    to_producer: InboxSender(MiddleToProducer),
+) !void {
+    while (inbox_from_consumer.tryRecv()) |m| switch (m) {
+        .Produce => |v| try to_producer.send(.{ .Work = v }),
+    };
+}
+
+// Middleman: forward up to Consumer
+fn middle_forward_up(
+    from_producer: OutboxReceiver(ProducerToMiddle),
+    outbox_to_consumer: OutboxSender(MiddleToConsumer),
+) !void {
+    while (from_producer.tryRecv()) |m| switch (m) {
+        .Result => |v| try outbox_to_consumer.send(.{ .Done = v }),
+    };
+}
+
+// Producer: echo work -> result
+fn producer_echo(inbox: InboxReceiver(MiddleToProducer), outbox: OutboxSender(ProducerToMiddle)) !void {
+    while (inbox.tryRecv()) |m| switch (m) {
+        .Work => |v| try outbox.send(.{ .Result = v }),
+    };
+}
+
+test "Nested SubApps: Consumer→Middleman→Producer ping flood with distinct message types" {
     const allocator = std.testing.allocator;
     var app = try App.default(allocator);
     defer app.deinit();
 
-    var leaf = try ecs.SubApp(P3Msg, P3Msg).init(allocator, .{ .inbox_capacity = 4, .outbox_capacity = 4 });
-    try leaf.addSystem("Update", leaf_echo);
+    // Producer (leaf)
+    var producer = try ecs.SubApp(MiddleToProducer, ProducerToMiddle).init(allocator, .{ .inbox_capacity = 4, .outbox_capacity = 4 });
+    try producer.addSystem("Update", producer_echo);
 
-    var middle = try ecs.SubApp(P3Msg, P3Msg).init(allocator, .{ .inbox_capacity = 4, .outbox_capacity = 4 });
-    try middle.addSubApp(&leaf);
+    // Middleman (nested)
+    var middle = try ecs.SubApp(ConsumerToMiddle, MiddleToConsumer).init(allocator, .{ .inbox_capacity = 4, .outbox_capacity = 4 });
+    try middle.addSubApp(&producer);
     try middle.addSystem("Update", middle_forward_down);
     try middle.addSystem("Update", middle_forward_up);
 
+    // Consumer (main)
     try app.addSubApp(&middle);
 
-    try app.insertResource(P3State{});
-    try app.addSystem("Update", p3_sender);
-    try app.addSystem("Update", p3_recv);
+    try app.insertResource(PipelineState{});
+    try app.addSystem("Update", consumer_send);
+    try app.addSystem("Update", consumer_recv);
 
-    try leaf.start(&middle.app);
+    // Start leaf within middle; then middle within app
+    try producer.start(&middle.app);
     try middle.start(&app);
 
     const done = try stepUntil(&app, 2_000_000_000, 4000, struct {
         fn pred(app_: *App) bool {
-            const s = app_.world.getResource(P3State).?;
+            const s = app_.world.getResource(PipelineState).?;
             return (s.want > 0) and (s.got == s.want);
         }
     }.pred);
     try std.testing.expect(done);
-
-    // App.deinit() will handle subapp cleanup automatically
 }
 
 // =====================================================================================
-// Test 2: Two independent worker SubApps
+// Test 2: Two independent worker SubApps (already distinct types; minor polish)
 // =====================================================================================
 
 const WorkerAMessage = union(enum) { Task: []const u8 };
@@ -235,23 +254,29 @@ test "Main mediates two concurrent SubApps with exact result join" {
     const ok = try stepUntil(&app, 500_000_000, 200, struct {
         fn pred(app_: *App) bool {
             const s = app_.world.getResource(MediatorState).?;
-            return s.results >= 2;
+            return s.results >= 2 and s.ra != null and s.rb != null;
         }
     }.pred);
     try std.testing.expect(ok);
-
-    // App.deinit() will handle subapp cleanup automatically
 }
 
 // =====================================================================================
-// Test 3: Burst 1,000 tasks
+// Test 3: Burst 1,000 tasks across nested SubApps (distinct types per hop)
 // =====================================================================================
 
-const BurstMsg = union(enum) { Task: u32, Done: void };
-const BurstRep = union(enum) { Ok: u32, Ack: void };
+// Consumer → Middleman
+const Burst_ConsumerToMiddle = union(enum) { Task: u32, Done: void };
+// Middleman → Consumer
+const Burst_MiddleToConsumer = union(enum) { Ok: u32, Ack: void };
+
+// Middleman → Producer
+const Burst_MiddleToProducer = union(enum) { Task: u32, Done: void };
+// Producer → Middleman
+const Burst_ProducerToMiddle = union(enum) { Ok: u32, Ack: void };
+
 const BurstState = struct { issued: u32 = 0, received: u32 = 0, finished: bool = false };
 
-fn burst_issue(s: ResMut(BurstState), mid_in: InboxSender(BurstMsg)) !void {
+fn burst_issue(s: ResMut(BurstState), mid_in: InboxSender(Burst_ConsumerToMiddle)) !void {
     if (s.ptr.issued == 0) {
         var i: u32 = 0;
         while (i < 1000) : (i += 1) {
@@ -261,52 +286,52 @@ fn burst_issue(s: ResMut(BurstState), mid_in: InboxSender(BurstMsg)) !void {
         try mid_in.send(.Done);
     }
 }
-fn burst_collect(s: ResMut(BurstState), mid_out: OutboxReceiver(BurstRep)) !void {
+fn burst_collect(s: ResMut(BurstState), mid_out: OutboxReceiver(Burst_MiddleToConsumer)) !void {
     while (mid_out.tryRecv()) |m| switch (m) {
         .Ok => |_| s.ptr.received += 1,
         .Ack => s.ptr.finished = true,
     };
 }
-fn mid_burst_down(inbox: InboxReceiver(BurstMsg), leaf_in: InboxSender(BurstMsg)) !void {
+fn mid_burst_down(inbox: InboxReceiver(Burst_ConsumerToMiddle), leaf_in: InboxSender(Burst_MiddleToProducer)) !void {
     while (inbox.tryRecv()) |m| switch (m) {
         .Task => |v| try leaf_in.send(.{ .Task = v }),
         .Done => try leaf_in.send(.Done),
     };
 }
-fn mid_burst_up(leaf_out: OutboxReceiver(BurstRep), outbox: OutboxSender(BurstRep)) !void {
+fn mid_burst_up(leaf_out: OutboxReceiver(Burst_ProducerToMiddle), outbox: OutboxSender(Burst_MiddleToConsumer)) !void {
     while (leaf_out.tryRecv()) |m| switch (m) {
         .Ok => |v| try outbox.send(.{ .Ok = v }),
         .Ack => try outbox.send(.Ack),
     };
 }
-fn leaf_burst(inbox: InboxReceiver(BurstMsg), outbox: OutboxSender(BurstRep)) !void {
+fn leaf_burst(inbox: InboxReceiver(Burst_MiddleToProducer), outbox: OutboxSender(Burst_ProducerToMiddle)) !void {
     while (inbox.tryRecv()) |m| switch (m) {
         .Task => |v| try outbox.send(.{ .Ok = v }),
         .Done => try outbox.send(.Ack),
     };
 }
 
-test "Backpressure stress: 1,000 message burst across nested threads with tiny queues" {
+test "Backpressure stress: 1,000 message burst across nested threads with tiny queues (distinct Ts)" {
     const allocator = std.testing.allocator;
     var app = try App.default(allocator);
     defer app.deinit();
 
-    var leaf = try ecs.SubApp(BurstMsg, BurstRep).init(allocator, .{ .inbox_capacity = 8, .outbox_capacity = 8 });
-    try leaf.addSystem("Update", leaf_burst);
+    var producer = try ecs.SubApp(Burst_MiddleToProducer, Burst_ProducerToMiddle).init(allocator, .{ .inbox_capacity = 8, .outbox_capacity = 8 });
+    try producer.addSystem("Update", leaf_burst);
 
-    var mid = try ecs.SubApp(BurstMsg, BurstRep).init(allocator, .{ .inbox_capacity = 8, .outbox_capacity = 8 });
-    try mid.addSubApp(&leaf);
-    try mid.addSystem("Update", mid_burst_down);
-    try mid.addSystem("Update", mid_burst_up);
+    var middle = try ecs.SubApp(Burst_ConsumerToMiddle, Burst_MiddleToConsumer).init(allocator, .{ .inbox_capacity = 8, .outbox_capacity = 8 });
+    try middle.addSubApp(&producer);
+    try middle.addSystem("Update", mid_burst_down);
+    try middle.addSystem("Update", mid_burst_up);
 
-    try app.addSubApp(&mid);
+    try app.addSubApp(&middle);
 
     try app.insertResource(BurstState{});
     try app.addSystem("Update", burst_issue);
     try app.addSystem("Update", burst_collect);
 
-    try leaf.start(&mid.app);
-    try mid.start(&app);
+    try producer.start(&middle.app);
+    try middle.start(&app);
 
     const ok = try stepUntil(&app, 3_000_000_000, 10_000, struct {
         fn pred(app_: *App) bool {
@@ -315,6 +340,4 @@ test "Backpressure stress: 1,000 message burst across nested threads with tiny q
         }
     }.pred);
     try std.testing.expect(ok);
-
-    // App.deinit() will handle subapp cleanup automatically
 }
