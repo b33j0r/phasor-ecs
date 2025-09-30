@@ -125,12 +125,32 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
             if (self.thread != null) return error.AlreadyStarted;
             const th = try std.Thread.spawn(.{}, Self.subAppThread, .{ &self.actor, &self.app });
             self.thread = th;
+
+            // Wait for child to signal it’s started
+            while (true) {
+                if (self.handle.status_rx.tryRecv()) |status| {
+                    switch (status) {
+                        .Started => return,
+                        .Stopped => return error.FailedToStart,
+                    }
+                }
+                try std.Thread.yield();
+            }
         }
 
         fn stop(self: *Self) !void {
             if (self.thread) |th| {
                 // Ask child to stop; then join.
                 try self.handle.ctrl_tx.send(.Stop);
+
+                // Wait for child to signal it’s stopped
+                while (true) {
+                    if (self.handle.status_rx.tryRecv()) |status| {
+                        if (status == .Stopped) break;
+                    }
+                    try std.Thread.yield();
+                }
+
                 th.join();
                 self.thread = null;
             }
