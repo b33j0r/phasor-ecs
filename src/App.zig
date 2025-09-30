@@ -6,13 +6,11 @@ const ScheduleManager = root.ScheduleManager;
 const Schedule = root.Schedule;
 const World = root.World;
 const Events = root.Events;
-const SubAppLifecycle = root.SubAppLifecycle;
 
 allocator: std.mem.Allocator,
 plugins: std.ArrayListUnmanaged(Plugin) = .empty,
 schedules: ScheduleManager,
 world: World,
-subapps: std.ArrayListUnmanaged(SubAppLifecycle) = .empty,
 step_start_schedule_name: []const u8 = "BeginFrame",
 
 const App = @This();
@@ -25,7 +23,7 @@ pub const Exit = struct { code: u8 };
 
 /// Default schedules
 pub fn default(allocator: std.mem.Allocator) !App {
-    var app = App.init(allocator);
+    var app = App.initEmpty(allocator);
 
     _ = try app.addSchedule("PreStartup");
     _ = try app.addSchedule("Startup");
@@ -53,7 +51,7 @@ pub fn default(allocator: std.mem.Allocator) !App {
     return app;
 }
 
-pub fn init(allocator: std.mem.Allocator) App {
+pub fn initEmpty(allocator: std.mem.Allocator) App {
     return App{
         .allocator = allocator,
         .plugins = .empty,
@@ -63,20 +61,10 @@ pub fn init(allocator: std.mem.Allocator) App {
 }
 
 pub fn deinit(self: *App) void {
-    // First stop all subapps to prevent use-after-free during cleanup
-    for (self.subapps.items) |*subapp_handle| {
-        subapp_handle.waitForStop(1_000_000_000) catch {
-            std.log.err("Timed out waiting for subapp to stop during App deinit", .{});
-        };
-    }
-    // Then deinit them
-    for (self.subapps.items) |*subapp_handle| {
-        subapp_handle.deinit();
-    }
-    self.subapps.deinit(self.allocator);
-
     for (self.plugins.items) |*plugin| {
-        plugin.cleanup(self);
+        plugin.cleanup(self) catch |err| {
+            std.log.err("Error during plugin cleanup: {any}", .{err});
+        };
         plugin.deinit();
     }
     self.plugins.deinit(self.allocator);
@@ -130,20 +118,28 @@ pub fn runSchedulesFrom(self: *App, start: []const u8) !void {
     }
 }
 
+pub fn runStartupSchedules(self: *App) !void {
+    try self.runSchedulesFrom("PreStartup");
+}
+
+pub fn runShutdownSchedules(self: *App) !void {
+    try self.runSchedulesFrom("PreShutdown");
+}
+
+pub fn run(self: *App) !u8 {
+    try self.runStartupSchedules();
+    const exit_res: Exit = blk: while (true) {
+        if (try self.step()) |exit| break :blk exit;
+    };
+    try self.runShutdownSchedules();
+    return exit_res.code;
+}
+
 pub fn step(self: *App) !?Exit {
     try self.runSchedulesFrom(self.step_start_schedule_name);
     if (self.world.getResource(Exit)) |exit| return exit.*;
     try self.runSchedulesFrom("BetweenFrames");
     return null;
-}
-
-pub fn run(self: *App) !u8 {
-    try self.runSchedulesFrom("PreStartup");
-    const exit_res: Exit = blk: while (true) {
-        if (try self.step()) |exit| break :blk exit;
-    };
-    try self.runSchedulesFrom("PreShutdown");
-    return exit_res.code;
 }
 
 pub fn insertResource(self: *App, resource: anytype) !void {
@@ -160,9 +156,4 @@ pub fn removeResource(self: *App, comptime T: type) bool {
 }
 pub fn registerEvent(self: *App, comptime T: type, capacity: usize) !void {
     try self.world.registerEvent(T, capacity);
-}
-
-pub fn addSubApp(self: *App, subapp: anytype) !void {
-    const handle = subapp.toHandle();
-    try self.subapps.append(self.allocator, handle);
 }

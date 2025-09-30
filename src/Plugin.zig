@@ -14,7 +14,7 @@ const Plugin = @This();
 pub const VTable = struct {
     // Thunks that receive an erased self pointer
     build: ?*const fn (*anyopaque, *App) anyerror!void,
-    cleanup: ?*const fn (*anyopaque, *App) void,
+    cleanup: ?*const fn (*anyopaque, *App) anyerror!void,
 
     // Always called on deinit; either frees or does nothing depending on ownership.
     destroy: *const fn (std.mem.Allocator, *anyopaque) void,
@@ -68,7 +68,7 @@ fn make(plugin_ptr: anytype, allocator: std.mem.Allocator, owned: bool) Plugin {
         fn build(ptr: *anyopaque, app: *App) anyerror!void {
             return (@as(*T, @ptrCast(@alignCast(ptr)))).build(app);
         }
-        fn cleanup(ptr: *anyopaque, app: *App) void {
+        fn cleanup(ptr: *anyopaque, app: *App) anyerror!void {
             return (@as(*T, @ptrCast(@alignCast(ptr)))).cleanup(app);
         }
         fn destroyOwned(allocator_: std.mem.Allocator, ptr: *anyopaque) void {
@@ -100,7 +100,7 @@ pub fn build(self: *const Plugin, app: *App) !void {
     if (self.vtable.build) |f| return f(self.self_ptr, app);
 }
 
-pub fn cleanup(self: *const Plugin, app: *App) void {
+pub fn cleanup(self: *const Plugin, app: *App) !void {
     if (self.vtable.cleanup) |f| return f(self.self_ptr, app);
 }
 

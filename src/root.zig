@@ -16,13 +16,8 @@ pub const ScheduleManager = @import("ScheduleManager.zig");
 pub const System = @import("System.zig");
 pub const World = @import("World.zig");
 
-const subapp_mod = @import("subapp/subapp.zig");
+const subapp_mod = @import("subapp.zig");
 pub const SubApp = subapp_mod.SubApp;
-pub const SubAppLifecycle = subapp_mod.SubAppLifecycle;
-pub const InboxSender = subapp_mod.InboxSender;
-pub const OutboxReceiver = subapp_mod.OutboxReceiver;
-pub const InboxReceiver = subapp_mod.InboxReceiver;
-pub const OutboxSender = subapp_mod.OutboxSender;
 
 const events = @import("events.zig");
 pub const Events = events.Events;
@@ -38,6 +33,10 @@ pub const ResMut = systems_mod.ResMut;
 pub const ResOpt = systems_mod.ResOpt;
 pub const Query = systems_mod.Query;
 pub const GroupBy = systems_mod.GroupBy;
+
+const phasor_actor = @import("phasor-actor");
+pub const Actor = phasor_actor.Actor;
+pub const Signal = phasor_actor.Signal;
 
 comptime {
     // Ensure that the dependencies are seen by the semantic analyzer
