@@ -7,7 +7,6 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
     return struct {
         allocator: std.mem.Allocator,
         app: App,
-        actor: Actor,
         handle: Handle,
         thread: ?std.Thread = null,
 
@@ -79,7 +78,6 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
             return .{
                 .allocator = allocator,
                 .app = app,
-                .actor = actor,
                 .handle = handle,
                 .thread = null,
             };
@@ -89,7 +87,11 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
             self.app.deinit();
         }
 
-        fn subAppThread(actor: *Actor, app: *App) !void {
+        fn subAppThread(app: *App) !void {
+            const actor = app.getResource(Actor) orelse {
+                return error.MissingActorResource;
+            };
+
             // child startup
             try app.runStartupSchedules();
 
@@ -123,7 +125,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
 
         fn start(self: *Self) !void {
             if (self.thread != null) return error.AlreadyStarted;
-            const th = try std.Thread.spawn(.{}, Self.subAppThread, .{ &self.actor, &self.app });
+            const th = try std.Thread.spawn(.{}, Self.subAppThread, .{&self.app});
             self.thread = th;
 
             // Wait for child to signal it’s started
@@ -169,7 +171,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
             }
 
             pub fn cleanup(self: *Plugin, _: *App) !void {
-                // Stop child and remove resources
+                // Stop child
                 try self.subapp.stop();
             }
         };
