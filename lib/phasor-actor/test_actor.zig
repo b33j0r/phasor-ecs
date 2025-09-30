@@ -24,7 +24,6 @@ test "Actor: doubler" {
             inbox: *DoublerActor.Inbox,
             outbox: *DoublerActor.Outbox,
             stop_signal: Signal(bool),
-            stopped_signal: Signal(bool),
         ) !void {
             while (!stop_signal.get()) {
                 // Try to receive a command
@@ -39,7 +38,6 @@ test "Actor: doubler" {
                     continue;
                 }
             }
-            stopped_signal.set(true);
         }
     };
 

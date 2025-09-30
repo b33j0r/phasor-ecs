@@ -218,7 +218,7 @@ pub fn Actor(comptime InboxT: type, comptime OutboxT: type) type {
                     var outbox = Outbox{ .internal_outbox = outbox_sender };
                     var inbox = Inbox{ .internal_inbox = inbox_receiver };
 
-                    ctx.work(&inbox, &outbox, shutdown, stopped) catch |err| {
+                    ctx.work(&inbox, &outbox, shutdown) catch |err| {
                         std.debug.print("Actor worker error: {s}\n", .{@errorName(err)});
                     };
 
