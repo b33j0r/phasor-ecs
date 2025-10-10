@@ -64,37 +64,13 @@ pub fn build(b: *std.Build) void {
     });
     const run_phasor_channel_tests = b.addRunArtifact(phasor_channel_tests);
 
-    // Add phasor-actor as a local module (depends on phasor-channel)
-    const phasor_actor_mod = b.addModule("phasor-actor", .{
-        .root_source_file = b.path("lib/phasor-actor/root.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "phasor-channel", .module = phasor_channel_mod },
-        },
-    });
-    const phasor_actor_tests_mod = b.addModule("phasor_actor_tests", .{
-        .root_source_file = b.path("lib/phasor-actor/test_actor.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "phasor-actor", .module = phasor_actor_mod },
-            .{ .name = "phasor-channel", .module = phasor_channel_mod },
-        },
-    });
-    const phasor_actor_tests = b.addTest(.{
-        .root_module = phasor_actor_tests_mod,
-    });
-    const run_phasor_actor_tests = b.addRunArtifact(phasor_actor_tests);
-
-    // The main phasor-ecs module (depends on phasor-db, phasor-actor, phasor-channel, phasor-graph)
+    // The main phasor-ecs module (depends on phasor-db, phasor-channel, phasor-graph)
     const phasor_ecs_mod = b.addModule("phasor-ecs", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "phasor-db", .module = phasor_db_mod },
-            .{ .name = "phasor-actor", .module = phasor_actor_mod },
             .{ .name = "phasor-channel", .module = phasor_channel_mod },
             .{ .name = "phasor-graph", .module = phasor_graph_mod },
         },
@@ -128,6 +104,5 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_phasor_ecs_dir_tests.step);
     test_step.dependOn(&run_phasor_db_tests.step);
     test_step.dependOn(&run_phasor_channel_tests.step);
-    test_step.dependOn(&run_phasor_actor_tests.step);
     test_step.dependOn(&run_phasor_graph_tests.step);
 }
