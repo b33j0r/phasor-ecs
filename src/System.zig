@@ -1,4 +1,5 @@
 run: *const fn (commands: *Commands) anyerror!void,
+register: *const fn (commands: *Commands) anyerror!void,
 
 const std = @import("std");
 
@@ -16,6 +17,23 @@ pub fn from(comptime system_fn: anytype) !System {
         return error.InvalidSystemFunction;
     }
 
+    // Registration function - called once when system is added to schedule
+    const registerFn = &struct {
+        pub fn register(commands: *Commands) !void {
+            const ArgsTupleType = std.meta.ArgsTuple(@TypeOf(system_fn));
+            inline for (std.meta.fields(ArgsTupleType)) |field| {
+                const ParamType = field.type;
+                const param_type_info = @typeInfo(ParamType);
+                if (param_type_info == .@"struct" or param_type_info == .@"union" or param_type_info == .@"enum") {
+                    if (@hasDecl(ParamType, "init_system_param_once")) {
+                        try ParamType.init_system_param_once(system_fn, commands);
+                    }
+                }
+            }
+        }
+    }.register;
+
+    // Run function - called every frame
     const runFn = &struct {
         pub fn run(commands: *Commands) !void {
             // Make an arg tuple type for the system function
@@ -33,7 +51,14 @@ pub fn from(comptime system_fn: anytype) !System {
                 } else if (@hasDecl(ParamType, "init_system_param")) {
                     // It's a system parameter (e.g., Res(T), Query(...), GroupBy(...))
                     var param_instance: ParamType = undefined;
-                    try param_instance.init_system_param(commands);
+
+                    // If it has init_system_param_with_context, use that (for EventReaders)
+                    if (@hasDecl(ParamType, "init_system_param_with_context")) {
+                        try param_instance.init_system_param_with_context(system_fn, commands);
+                    } else {
+                        try param_instance.init_system_param(commands);
+                    }
+
                     args_tuple[i] = param_instance;
                 } else {
                     @compileError("Unsupported system parameter type: " ++ @typeName(ParamType));
@@ -55,5 +80,5 @@ pub fn from(comptime system_fn: anytype) !System {
         }
     }.run;
 
-    return System{ .run = runFn };
+    return System{ .run = runFn, .register = registerFn };
 }

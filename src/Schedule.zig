@@ -39,8 +39,15 @@ pub fn deinit(self: *Schedule) void {
     self.systems = .empty;
 }
 
-pub fn add(self: *Schedule, comptime system_fn: anytype) !void {
+/// Add a system to the schedule and register it with the world
+pub fn addWithWorld(self: *Schedule, comptime system_fn: anytype, world: *World) !void {
     const system = try System.from(system_fn);
+
+    // Call the registration function with the world
+    var commands = world.commands();
+    defer commands.deinit();
+    try system.register(&commands);
+
     try self.systems.append(self.allocator, system);
 }
 

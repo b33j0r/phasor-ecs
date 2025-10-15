@@ -95,7 +95,7 @@ pub fn removeSchedule(self: *App, name: []const u8) !void {
     return self.schedules.removeSchedule(name);
 }
 pub fn addSystem(self: *App, schedule_name: []const u8, comptime system_fn: anytype) !void {
-    try self.schedules.addSystem(schedule_name, system_fn);
+    try self.schedules.addSystem(schedule_name, system_fn, &self.world);
 }
 pub fn scheduleBefore(self: *App, name: []const u8, other: []const u8) !void {
     try self.schedules.scheduleBefore(name, other);

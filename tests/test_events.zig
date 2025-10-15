@@ -1,5 +1,3 @@
-
-
 test "World registerEvent adds Events(T) resource" {
     const alloc = std.testing.allocator;
     var world = World.init(alloc);
@@ -33,11 +31,14 @@ test "EventWriter enqueues into Events(T)" {
     var sched = Schedule.init(alloc);
     defer sched.deinit();
 
-    try sched.add(sys);
+    try sched.addWithWorld(sys, &world);
     try sched.run(&world);
 
+    // Subscribe to read the event
     const events = world.getResource(Events(i32)).?;
-    const ev = try events.tryRecv();
+    var receiver = try events.subscribe();
+    defer receiver.deinit();
+    const ev = receiver.tryRecv();
     try std.testing.expectEqual(@as(i32, 7), ev);
 }
 
@@ -58,7 +59,7 @@ test "EventReader drains all queued events" {
         pub fn f(r: EventReader(i32)) !void {
             var seen: [3]i32 = undefined;
             var i: usize = 0;
-            while (try r.tryRecv()) |ev| : (i += 1) {
+            while (r.tryRecv()) |ev| : (i += 1) {
                 seen[i] = ev;
             }
             try std.testing.expectEqualSlices(i32, &.{ 1, 2, 3 }, seen[0..i]);
@@ -68,7 +69,7 @@ test "EventReader drains all queued events" {
     var sched = Schedule.init(alloc);
     defer sched.deinit();
 
-    try sched.add(sys);
+    try sched.addWithWorld(sys, &world);
     try sched.run(&world);
 }
 
@@ -87,7 +88,7 @@ test "EventWriter in one system, EventReader in another" {
 
     const read_sys = struct {
         pub fn f(r: EventReader(i32)) !void {
-            const val = try r.tryRecv();
+            const val = r.tryRecv();
             try std.testing.expectEqual(@as(i32, 42), val);
         }
     }.f;
@@ -95,8 +96,45 @@ test "EventWriter in one system, EventReader in another" {
     var sched = Schedule.init(alloc);
     defer sched.deinit();
 
-    try sched.add(write_sys);
-    try sched.add(read_sys);
+    try sched.addWithWorld(write_sys, &world);
+    try sched.addWithWorld(read_sys, &world);
+
+    try sched.run(&world);
+}
+
+test "EventWriter in one system, EventReaders in two systems" {
+    const alloc = std.testing.allocator;
+    var world = World.init(alloc);
+    defer world.deinit();
+
+    try world.registerEvent(i32, 4);
+
+    const write_sys = struct {
+        pub fn f(w: EventWriter(i32)) !void {
+            try w.send(100);
+        }
+    }.f;
+
+    const read_sys1 = struct {
+        pub fn f(r: EventReader(i32)) !void {
+            const val = r.tryRecv();
+            try std.testing.expectEqual(@as(i32, 100), val);
+        }
+    }.f;
+
+    const read_sys2 = struct {
+        pub fn f(r: EventReader(i32)) !void {
+            const val = r.tryRecv();
+            try std.testing.expectEqual(@as(i32, 100), val);
+        }
+    }.f;
+
+    var sched = Schedule.init(alloc);
+    defer sched.deinit();
+
+    try sched.addWithWorld(write_sys, &world);
+    try sched.addWithWorld(read_sys1, &world);
+    try sched.addWithWorld(read_sys2, &world);
 
     try sched.run(&world);
 }

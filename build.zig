@@ -52,7 +52,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const phasor_channel_tests_mod = b.addModule("phasor_channel_tests", .{
-        .root_source_file = b.path("lib/phasor-channel/test_channel.zig"),
+        .root_source_file = b.path("lib/phasor-channel/tests.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{

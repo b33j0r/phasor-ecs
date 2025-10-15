@@ -8,15 +8,24 @@ const Database = root.db.Database;
 const ResourceManager = root.ResourceManager;
 const Commands = root.Commands;
 const Events = root.Events;
+const EventReaderRegistry = root.EventReaderRegistry;
 
 const World = @This();
 
 pub fn init(allocator: std.mem.Allocator) World {
-    return World{
+    var world = World{
         .allocator = allocator,
         .entities = Database.init(allocator),
         .resources = ResourceManager.init(allocator),
     };
+
+    // Initialize EventReaderRegistry
+    const registry = EventReaderRegistry.init(allocator);
+    world.resources.insert(registry) catch |err| {
+        std.log.err("Failed to initialize EventReaderRegistry: {any}", .{err});
+    };
+
+    return world;
 }
 
 pub fn deinit(self: *World) void {

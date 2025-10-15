@@ -11,6 +11,7 @@ const std = @import("std");
 
 const root = @import("root.zig");
 const Schedule = root.Schedule;
+const World = root.World;
 
 const phasor_graph = @import("phasor-graph");
 const Graph = phasor_graph.Graph;
@@ -132,12 +133,12 @@ pub fn addScheduleBetween(self: *ScheduleManager, name: []const u8, first: []con
     return sched;
 }
 
-pub fn addSystem(self: *ScheduleManager, schedule_name: []const u8, comptime system_fn: anytype) !void {
+pub fn addSystem(self: *ScheduleManager, schedule_name: []const u8, comptime system_fn: anytype, world: *World) !void {
     const node = self.name_to_node.get(schedule_name) orelse return Error.ScheduleNotFound;
     const id = self.graph.getNodeWeight(node);
     const idx_u32 = self.id_to_index.get(id) orelse return Error.ScheduleNotFound;
     const idx: usize = @intCast(idx_u32);
-    try self.schedules.items[idx].add(system_fn);
+    try self.schedules.items[idx].addWithWorld(system_fn, world);
 }
 
 pub const ScheduleIterator = struct {
