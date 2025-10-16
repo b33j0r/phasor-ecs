@@ -78,7 +78,7 @@ pub fn EventWriter(comptime T: type) type {
 
         const Self = @This();
 
-        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+        pub fn init_system_param(self: *Self, comptime _: anytype, commands: *Commands) !void {
             self.events = commands.getResource(Events(T));
             if (self.events == null) return error.EventMustBeRegistered;
         }
@@ -107,7 +107,7 @@ pub fn EventReader(comptime T: type) type {
             if (events == null) return error.EventMustBeRegistered;
 
             // TODO: don't get from commands
-            var registry = &world.event_readers;
+            var registry = &world.subscriptions;
 
             // Generate unique key for this system + event type combo
             const key = SubscriptionManager.makeKey(system_fn, T);
@@ -147,14 +147,14 @@ pub fn EventReader(comptime T: type) type {
         }
 
         /// Per-frame initialization - looks up subscription from registry
-        pub fn init_system_param_with_context(self: *Self, comptime system_fn: anytype, commands: *Commands) !void {
+        pub fn init_system_param(self: *Self, comptime system_fn: anytype, commands: *Commands) !void {
             const Wrapper = struct {
                 receiver: Events(T).Channel.Receiver,
                 allocator: std.mem.Allocator,
             };
 
             // TODO: don't get from commands
-            var registry = &commands.world.event_readers;
+            var registry = &commands.world.subscriptions;
 
             const key = SubscriptionManager.makeKey(system_fn, T);
 

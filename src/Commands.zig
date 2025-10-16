@@ -9,6 +9,7 @@ const CommandBuffer = root.CommandBuffer;
 const World = root.World;
 const Entity = root.db.Entity;
 const QueryResult = root.db.QueryResult;
+const GroupByResult = root.db.GroupByResult;
 
 const meta = @import("meta.zig");
 const Cons = meta.Cons;
@@ -122,12 +123,20 @@ pub fn getResource(self: *Commands, comptime T: type) ?*T {
     return self.world.getResource(T);
 }
 
+pub fn getResourceMut(self: *Commands, comptime T: type) ?*T {
+    return self.world.getResourceMut(T);
+}
+
 pub fn hasResource(self: *Commands, comptime T: type) bool {
     return self.world.hasResource(T);
 }
 
 pub fn query(self: *Commands, comptime Parts: anytype) !QueryResult {
     return try self.world.entities.query(Parts);
+}
+
+pub fn groupBy(self: *Commands, comptime Parts: anytype) !GroupByResult {
+    return try self.world.entities.groupBy(Parts);
 }
 
 /// Creates a wrapper that adds a DefaultComponentT to every
@@ -144,7 +153,7 @@ pub fn Scoped(comptime DefaultComponentT: anytype) type {
             };
         }
 
-        pub fn init_system_param(self: *Self, commands: *Commands) !void {
+        pub fn init_system_param(self: *Self, comptime _: anytype, commands: *Commands) !void {
             self.commands = commands;
         }
 

@@ -1,7 +1,7 @@
 allocator: std.mem.Allocator,
 entities: Database,
 resources: ResourceManager,
-event_readers: SubscriptionManager,
+subscriptions: SubscriptionManager,
 
 const std = @import("std");
 const root = @import("root.zig");
@@ -18,14 +18,14 @@ pub fn init(allocator: std.mem.Allocator) World {
         .allocator = allocator,
         .entities = Database.init(allocator),
         .resources = ResourceManager.init(allocator),
-        .event_readers = SubscriptionManager.init(allocator),
+        .subscriptions = SubscriptionManager.init(allocator),
     };
 }
 
 pub fn deinit(self: *World) void {
     self.entities.deinit();
     self.resources.deinit();
-    self.event_readers.deinit();
+    self.subscriptions.deinit();
 }
 
 pub fn commands(self: *World) Commands {

@@ -1,14 +1,6 @@
 run: *const fn (commands: *Commands) anyerror!void,
 register: *const fn (world: *World) anyerror!void,
 
-const std = @import("std");
-
-const root = @import("root.zig");
-const Commands = root.Commands;
-const Scoped = root.Scoped;
-const System = root.System;
-const World = root.World;
-
 pub fn from(comptime system_fn: anytype) !System {
     // Validate that system_fn is a function
     const fn_type = @TypeOf(system_fn);
@@ -48,15 +40,10 @@ pub fn from(comptime system_fn: anytype) !System {
                 if (ParamType == *Commands) {
                     // Get transaction from database
                     args_tuple[i] = commands;
-                } else if (@hasDecl(ParamType, "init_system_param_with_context")) {
-                    // It's a system parameter (e.g., Res(T), Query(...), GroupBy(...))
-                    var param_instance: ParamType = undefined;
-                    try param_instance.init_system_param_with_context(system_fn, commands);
-                    args_tuple[i] = param_instance;
                 } else if (@hasDecl(ParamType, "init_system_param")) {
                     // It's a system parameter (e.g., Res(T), Query(...), GroupBy(...))
                     var param_instance: ParamType = undefined;
-                    try param_instance.init_system_param(commands);
+                    try param_instance.init_system_param(system_fn, commands);
                     args_tuple[i] = param_instance;
                 } else {
                     @compileError("Unsupported system parameter type: " ++ @typeName(ParamType));
@@ -80,3 +67,13 @@ pub fn from(comptime system_fn: anytype) !System {
 
     return System{ .run = runFn, .register = registerFn };
 }
+
+// Imports
+const std = @import("std");
+
+const root = @import("root.zig");
+const Commands = root.Commands;
+const Scoped = root.Scoped;
+const System = root.System;
+const World = root.World;
+const SubscriptionManager = root.SubscriptionManager;

@@ -179,7 +179,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
         pub const InboxSender = struct {
             chan: ?InboxChannel.Sender = null,
 
-            pub fn init_system_param(self: *InboxSender, commands: *Commands) !void {
+            pub fn init_system_param(self: *InboxSender, comptime _: anytype, commands: *Commands) !void {
                 const handle = commands.getResource(Handle).?;
                 self.chan = handle.inbox_sender;
             }
@@ -193,7 +193,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
         pub const OutboxReceiver = struct {
             chan: ?OutboxChannel.Receiver = null,
 
-            pub fn init_system_param(self: *OutboxReceiver, commands: *Commands) !void {
+            pub fn init_system_param(self: *OutboxReceiver, comptime _: anytype, commands: *Commands) !void {
                 const handle = commands.getResource(Handle).?;
                 self.chan = handle.outbox_receiver;
             }
@@ -207,7 +207,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
         pub const OutboxSender = struct {
             chan: ?OutboxChannel.Sender = null,
 
-            pub fn init_system_param(self: *OutboxSender, commands: *Commands) !void {
+            pub fn init_system_param(self: *OutboxSender, comptime _: anytype, commands: *Commands) !void {
                 const actor = commands.getResource(Actor).?;
                 self.chan = actor.outbox_sender;
             }
@@ -221,7 +221,7 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
         pub const InboxReceiver = struct {
             chan: ?InboxChannel.Receiver = null,
 
-            pub fn init_system_param(self: *InboxReceiver, commands: *Commands) !void {
+            pub fn init_system_param(self: *InboxReceiver, comptime _: anytype, commands: *Commands) !void {
                 const actor = commands.getResource(Actor).?;
                 self.chan = actor.inbox_receiver;
             }
@@ -240,6 +240,7 @@ const std = @import("std");
 const root = @import("root.zig");
 const App = root.App;
 const Commands = root.Commands;
+const World = root.World;
 
 const phasor_channel = @import("phasor-channel");
 const Channel = phasor_channel.Channel;

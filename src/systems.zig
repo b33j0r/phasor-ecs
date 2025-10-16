@@ -7,6 +7,7 @@ const QueryResult = phasor_db.QueryResult;
 
 const ecs = @import("root.zig");
 const Commands = ecs.Commands;
+const World = ecs.World;
 
 const meta = @import("meta.zig");
 const Cons = meta.Cons;
@@ -26,8 +27,8 @@ pub fn Res(comptime ResourceT: type) type {
         const Self = @This();
         pub const T = ResourceT;
 
-        pub fn init_system_param(self: *Self, commands: *Commands) !void {
-            self.ptr = commands.world.getResourceMut(ResourceT).?;
+        pub fn init_system_param(self: *Self, comptime _: anytype, commands: *Commands) !void {
+            self.ptr = commands.getResource(ResourceT).?;
         }
     };
 }
@@ -41,8 +42,8 @@ pub fn ResMut(comptime ResourceT: type) type {
         const Self = @This();
         pub const T = ResourceT;
 
-        pub fn init_system_param(self: *Self, commands: *Commands) !void {
-            self.ptr = commands.world.getResourceMut(ResourceT).?;
+        pub fn init_system_param(self: *Self, comptime _: anytype, commands: *Commands) !void {
+            self.ptr = commands.getResourceMut(ResourceT).?;
         }
     };
 }
@@ -55,8 +56,8 @@ pub fn ResOpt(comptime ResourceT: type) type {
         const Self = @This();
         pub const T = ResourceT;
 
-        pub fn init_system_param(self: *Self, commands: *Commands) !void {
-            self.ptr = commands.world.getResourceMut(ResourceT);
+        pub fn init_system_param(self: *Self, comptime _: anytype, commands: *Commands) !void {
+            self.ptr = commands.getResourceMut(ResourceT);
         }
     };
 }
@@ -73,8 +74,8 @@ pub fn Query(comptime Parts: anytype) type {
         const Self = @This();
 
         /// Initializes this system parameter by executing the query on the world via commands.
-        pub fn init_system_param(self: *Self, commands: *Commands) !void {
-            self.result = try commands.world.entities.query(Parts);
+        pub fn init_system_param(self: *Self, comptime _: anytype, commands: *Commands) !void {
+            self.result = try commands.query(Parts);
         }
 
         /// Free resources held by the underlying QueryResult.
@@ -138,8 +139,8 @@ pub fn GroupBy(comptime TraitT: anytype) type {
         const Self = @This();
 
         /// Initializes this system parameter by grouping the entire DB by TraitT.
-        pub fn init_system_param(self: *Self, commands: *Commands) !void {
-            self.result = try commands.world.entities.groupBy(TraitT);
+        pub fn init_system_param(self: *Self, comptime _: anytype, commands: *Commands) !void {
+            self.result = try commands.groupBy(TraitT);
         }
 
         /// Free resources held by the underlying GroupByResult.
