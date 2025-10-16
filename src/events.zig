@@ -6,8 +6,9 @@ const std = @import("std");
 const phasor_channel = @import("phasor-channel");
 
 const root = @import("root.zig");
+const World = root.World;
 const Commands = root.Commands;
-const EventReaderRegistry = root.EventReaderRegistry;
+const SubscriptionManager = root.SubscriptionManager;
 
 pub fn Events(comptime T: type) type {
     return struct {
@@ -101,15 +102,15 @@ pub fn EventReader(comptime T: type) type {
         const Self = @This();
 
         /// One-time initialization per system - creates and stores subscription in registry
-        pub fn register_system_param(comptime system_fn: anytype, commands: *Commands) !void {
-            const events = commands.getResource(Events(T));
+        pub fn register_system_param(comptime system_fn: anytype, world: *World) !void {
+            const events = world.getResource(Events(T));
             if (events == null) return error.EventMustBeRegistered;
 
             // TODO: don't get from commands
-            var registry = &commands.world.event_readers;
+            var registry = &world.event_readers;
 
             // Generate unique key for this system + event type combo
-            const key = EventReaderRegistry.makeKey(system_fn, T);
+            const key = SubscriptionManager.makeKey(system_fn, T);
 
             // Check if already subscribed
             if (registry.get(key)) |_| {
@@ -122,7 +123,7 @@ pub fn EventReader(comptime T: type) type {
                 allocator: std.mem.Allocator,
             };
 
-            const alloc = commands.world.allocator;
+            const alloc = world.allocator;
             const wrapper_ptr = try alloc.create(Wrapper);
             errdefer alloc.destroy(wrapper_ptr);
 
@@ -155,7 +156,7 @@ pub fn EventReader(comptime T: type) type {
             // TODO: don't get from commands
             var registry = &commands.world.event_readers;
 
-            const key = EventReaderRegistry.makeKey(system_fn, T);
+            const key = SubscriptionManager.makeKey(system_fn, T);
 
             const wrapper_opaque = registry.get(key) orelse
                 return error.EventReaderNotSubscribed;

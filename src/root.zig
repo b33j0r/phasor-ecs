@@ -24,7 +24,7 @@ pub const Events = events.Events;
 pub const EventReader = events.EventReader;
 pub const EventWriter = events.EventWriter;
 
-pub const EventReaderRegistry = @import("EventReaderRegistry.zig");
+pub const SubscriptionManager = @import("SubscriptionManager.zig");
 
 pub const Commands = @import("Commands.zig");
 pub const Scoped = Commands.Scoped;

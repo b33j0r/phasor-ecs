@@ -44,9 +44,7 @@ pub fn addWithWorld(self: *Schedule, comptime system_fn: anytype, world: *World)
     const system = try System.from(system_fn);
 
     // Call the registration function with the world
-    var commands = world.commands();
-    defer commands.deinit();
-    try system.register(&commands);
+    try system.register(world);
 
     try self.systems.append(self.allocator, system);
 }

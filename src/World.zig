@@ -1,7 +1,7 @@
 allocator: std.mem.Allocator,
 entities: Database,
 resources: ResourceManager,
-event_readers: EventReaderRegistry,
+event_readers: SubscriptionManager,
 
 const std = @import("std");
 const root = @import("root.zig");
@@ -9,7 +9,7 @@ const Database = root.db.Database;
 const ResourceManager = root.ResourceManager;
 const Commands = root.Commands;
 const Events = root.Events;
-const EventReaderRegistry = root.EventReaderRegistry;
+const SubscriptionManager = root.SubscriptionManager;
 
 const World = @This();
 
@@ -18,7 +18,7 @@ pub fn init(allocator: std.mem.Allocator) World {
         .allocator = allocator,
         .entities = Database.init(allocator),
         .resources = ResourceManager.init(allocator),
-        .event_readers = EventReaderRegistry.init(allocator),
+        .event_readers = SubscriptionManager.init(allocator),
     };
 }
 

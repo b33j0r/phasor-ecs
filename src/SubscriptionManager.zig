@@ -4,7 +4,7 @@
 
 const std = @import("std");
 
-const EventReaderRegistry = @This();
+const SubscriptionManager = @This();
 
 const SubscriptionEntry = struct {
     ptr: *anyopaque,
@@ -15,14 +15,14 @@ allocator: std.mem.Allocator,
 subscriptions: std.AutoHashMap(u64, SubscriptionEntry),
 mutex: std.Thread.Mutex = .{},
 
-pub fn init(allocator: std.mem.Allocator) EventReaderRegistry {
+pub fn init(allocator: std.mem.Allocator) SubscriptionManager {
     return .{
         .allocator = allocator,
         .subscriptions = std.AutoHashMap(u64, SubscriptionEntry).init(allocator),
     };
 }
 
-pub fn deinit(self: *EventReaderRegistry) void {
+pub fn deinit(self: *SubscriptionManager) void {
     self.mutex.lock();
     defer self.mutex.unlock();
 
@@ -49,14 +49,14 @@ pub fn makeKey(comptime system_fn: anytype, comptime T: type) u64 {
 }
 
 /// Store a subscription for a given key with its cleanup function
-pub fn store(self: *EventReaderRegistry, key: u64, subscription: *anyopaque, deinit_fn: *const fn (*anyopaque) void) !void {
+pub fn store(self: *SubscriptionManager, key: u64, subscription: *anyopaque, deinit_fn: *const fn (*anyopaque) void) !void {
     self.mutex.lock();
     defer self.mutex.unlock();
     try self.subscriptions.put(key, .{ .ptr = subscription, .deinit_fn = deinit_fn });
 }
 
 /// Retrieve a subscription for a given key
-pub fn get(self: *EventReaderRegistry, key: u64) ?*anyopaque {
+pub fn get(self: *SubscriptionManager, key: u64) ?*anyopaque {
     self.mutex.lock();
     defer self.mutex.unlock();
     if (self.subscriptions.get(key)) |entry| {
@@ -66,7 +66,7 @@ pub fn get(self: *EventReaderRegistry, key: u64) ?*anyopaque {
 }
 
 /// Remove a subscription for a given key (used during cleanup)
-pub fn remove(self: *EventReaderRegistry, key: u64) bool {
+pub fn remove(self: *SubscriptionManager, key: u64) bool {
     self.mutex.lock();
     defer self.mutex.unlock();
     return self.subscriptions.remove(key);

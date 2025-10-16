@@ -1,5 +1,5 @@
 run: *const fn (commands: *Commands) anyerror!void,
-register: *const fn (commands: *Commands) anyerror!void,
+register: *const fn (world: *World) anyerror!void,
 
 const std = @import("std");
 
@@ -19,14 +19,14 @@ pub fn from(comptime system_fn: anytype) !System {
 
     // Registration function - called once when system is added to schedule
     const registerFn = &struct {
-        pub fn register(commands: *Commands) !void {
+        pub fn register(world: *World) !void {
             const ArgsTupleType = std.meta.ArgsTuple(@TypeOf(system_fn));
             inline for (std.meta.fields(ArgsTupleType)) |field| {
                 const ParamType = field.type;
                 const param_type_info = @typeInfo(ParamType);
                 if (param_type_info == .@"struct" or param_type_info == .@"union" or param_type_info == .@"enum") {
                     if (@hasDecl(ParamType, "register_system_param")) {
-                        try ParamType.register_system_param(system_fn, commands);
+                        try ParamType.register_system_param(system_fn, world);
                     }
                 }
             }
