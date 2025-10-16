@@ -15,7 +15,7 @@ test "System with no params" {
 
     const allocator = std.testing.allocator;
 
-    var schedule = Schedule.init(allocator);
+    var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
     try schedule.addWithWorld(system_with_no_params_fn, &world);
@@ -33,7 +33,7 @@ test "System with transaction system param" {
     var world = World.init(allocator);
     defer world.deinit();
 
-    var schedule = Schedule.init(allocator);
+    var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
     try schedule.addWithWorld(system_with_tx_param_fn, &world);
@@ -52,7 +52,7 @@ test "System with Query(.{T}) param" {
     // Create one Player entity so the query sees it
     _ = try world.entities.createEntity(.{Player{}});
 
-    var schedule = Schedule.init(allocator);
+    var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
     const system_with_query_param_fn = struct {
@@ -96,7 +96,7 @@ test "System with GroupBy(Trait) param" {
     _ = try world.entities.createEntity(.{Component1{}});
     _ = try world.entities.createEntity(.{Component2{}});
 
-    var schedule = Schedule.init(allocator);
+    var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
     const system_with_groupby_param_fn = struct {
@@ -145,7 +145,7 @@ test "System with combination of params" {
         }
     }.system_with_combined_params;
 
-    var schedule = Schedule.init(allocator);
+    var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
     try schedule.addWithWorld(system_with_combined_params_fn, &world);
@@ -174,7 +174,7 @@ test "System with Res(T) param" {
 
     try world.insertResource(Health{ .current = 80, .max = 100 });
 
-    var schedule = Schedule.init(allocator);
+    var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
     try schedule.addWithWorld(system_with_res_param_fn, &world);
@@ -196,7 +196,7 @@ test "System with ResMut(T) param" {
 
     try world.insertResource(Health{ .current = 93, .max = 100 });
 
-    var schedule = Schedule.init(allocator);
+    var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
     try schedule.addWithWorld(system_with_res_param_fn, &world);
@@ -222,7 +222,7 @@ test "System with ResOpt(T) param" {
         }
     }.system_with_resopt_param;
 
-    var schedule = Schedule.init(allocator);
+    var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
     try schedule.addWithWorld(system_with_resopt_param_fn, &world);
