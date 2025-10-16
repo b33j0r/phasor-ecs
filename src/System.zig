@@ -25,8 +25,8 @@ pub fn from(comptime system_fn: anytype) !System {
                 const ParamType = field.type;
                 const param_type_info = @typeInfo(ParamType);
                 if (param_type_info == .@"struct" or param_type_info == .@"union" or param_type_info == .@"enum") {
-                    if (@hasDecl(ParamType, "init_system_param_once")) {
-                        try ParamType.init_system_param_once(system_fn, commands);
+                    if (@hasDecl(ParamType, "register_system_param")) {
+                        try ParamType.register_system_param(system_fn, commands);
                     }
                 }
             }

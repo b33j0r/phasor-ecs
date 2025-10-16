@@ -1,6 +1,7 @@
 allocator: std.mem.Allocator,
 entities: Database,
 resources: ResourceManager,
+event_readers: EventReaderRegistry,
 
 const std = @import("std");
 const root = @import("root.zig");
@@ -13,24 +14,18 @@ const EventReaderRegistry = root.EventReaderRegistry;
 const World = @This();
 
 pub fn init(allocator: std.mem.Allocator) World {
-    var world = World{
+    return World{
         .allocator = allocator,
         .entities = Database.init(allocator),
         .resources = ResourceManager.init(allocator),
+        .event_readers = EventReaderRegistry.init(allocator),
     };
-
-    // Initialize EventReaderRegistry
-    const registry = EventReaderRegistry.init(allocator);
-    world.resources.insert(registry) catch |err| {
-        std.log.err("Failed to initialize EventReaderRegistry: {any}", .{err});
-    };
-
-    return world;
 }
 
 pub fn deinit(self: *World) void {
     self.entities.deinit();
     self.resources.deinit();
+    self.event_readers.deinit();
 }
 
 pub fn commands(self: *World) Commands {

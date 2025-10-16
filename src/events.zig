@@ -101,13 +101,12 @@ pub fn EventReader(comptime T: type) type {
         const Self = @This();
 
         /// One-time initialization per system - creates and stores subscription in registry
-        pub fn init_system_param_once(comptime system_fn: anytype, commands: *Commands) !void {
+        pub fn register_system_param(comptime system_fn: anytype, commands: *Commands) !void {
             const events = commands.getResource(Events(T));
             if (events == null) return error.EventMustBeRegistered;
 
-            // Get or create the registry
-            const registry = commands.getResource(EventReaderRegistry) orelse
-                return error.EventReaderRegistryNotFound;
+            // TODO: don't get from commands
+            var registry = &commands.world.event_readers;
 
             // Generate unique key for this system + event type combo
             const key = EventReaderRegistry.makeKey(system_fn, T);
@@ -153,8 +152,8 @@ pub fn EventReader(comptime T: type) type {
                 allocator: std.mem.Allocator,
             };
 
-            const registry = commands.getResource(EventReaderRegistry) orelse
-                return error.EventReaderRegistryNotFound;
+            // TODO: don't get from commands
+            var registry = &commands.world.event_readers;
 
             const key = EventReaderRegistry.makeKey(system_fn, T);
 
