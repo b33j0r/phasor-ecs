@@ -1,8 +1,9 @@
+//! Global registry for EventReader subscriptions.
+//! Each system's EventReader(T) gets a unique subscription stored here.
+//! The key is a hash of the system function pointer and event type.
+
 const std = @import("std");
 
-/// Global registry for EventReader subscriptions.
-/// Each system's EventReader(T) gets a unique subscription stored here.
-/// The key is a hash of the system function pointer and event type.
 const EventReaderRegistry = @This();
 
 const SubscriptionEntry = struct {

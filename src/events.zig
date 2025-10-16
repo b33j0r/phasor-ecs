@@ -165,13 +165,6 @@ pub fn EventReader(comptime T: type) type {
             self.receiver = &wrapper.receiver;
         }
 
-        // Fallback for compatibility
-        pub fn init_system_param(self: *Self, commands: *Commands) !void {
-            _ = commands;
-            _ = self;
-            return error.EventReaderRequiresSystemContext;
-        }
-
         pub fn deinit(self: *Self) void {
             // Don't deinit the receiver - it's owned by the registry
             self.receiver = null;

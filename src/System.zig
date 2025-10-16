@@ -48,17 +48,15 @@ pub fn from(comptime system_fn: anytype) !System {
                 if (ParamType == *Commands) {
                     // Get transaction from database
                     args_tuple[i] = commands;
+                } else if (@hasDecl(ParamType, "init_system_param_with_context")) {
+                    // It's a system parameter (e.g., Res(T), Query(...), GroupBy(...))
+                    var param_instance: ParamType = undefined;
+                    try param_instance.init_system_param_with_context(system_fn, commands);
+                    args_tuple[i] = param_instance;
                 } else if (@hasDecl(ParamType, "init_system_param")) {
                     // It's a system parameter (e.g., Res(T), Query(...), GroupBy(...))
                     var param_instance: ParamType = undefined;
-
-                    // If it has init_system_param_with_context, use that (for EventReaders)
-                    if (@hasDecl(ParamType, "init_system_param_with_context")) {
-                        try param_instance.init_system_param_with_context(system_fn, commands);
-                    } else {
-                        try param_instance.init_system_param(commands);
-                    }
-
+                    try param_instance.init_system_param(commands);
                     args_tuple[i] = param_instance;
                 } else {
                     @compileError("Unsupported system parameter type: " ++ @typeName(ParamType));
