@@ -19,14 +19,14 @@ const FlagContext = struct {
 // Test that Command.from builds a command that can execute and cleanup
 test "Command.from executes and cleanup is called" {
     const allocator = std.testing.allocator;
-    var world = ecs.World.init(allocator);
+    var world = try ecs.World.init(allocator);
     defer world.deinit();
 
     var executed = false;
     var cleaned = false;
 
     var cmd = try Command.from(allocator, FlagContext{ .executed = &executed, .cleaned = &cleaned });
-    try cmd.execute(&world);
+    try cmd.execute(world);
     try std.testing.expect(executed);
     // cleanup should be invoked manually or by a buffer; call directly here
     cmd.cleanup();
@@ -36,7 +36,7 @@ test "Command.from executes and cleanup is called" {
 // Test that CommandBuffer queues and flushes commands in order
 test "CommandBuffer queues and flushes in order" {
     const allocator = std.testing.allocator;
-    var world = ecs.World.init(allocator);
+    var world = try ecs.World.init(allocator);
     defer world.deinit();
 
     var buffer = CommandBuffer.init(allocator);
@@ -61,7 +61,7 @@ test "CommandBuffer queues and flushes in order" {
     try buffer.queueContext(Ctx{ .log = &log, .name = "A" });
     try buffer.queueContext(Ctx{ .log = &log, .name = "B" });
 
-    try buffer.flush(&world);
+    try buffer.flush(world);
 
     try std.testing.expectEqual(@as(usize, 2), log.items.len);
     try std.testing.expect(std.mem.eql(u8, log.items[0], "A"));
@@ -71,10 +71,10 @@ test "CommandBuffer queues and flushes in order" {
 // Test that Commands can reserve IDs and create entities via queued commands
 test "Commands createEntity" {
     const allocator = std.testing.allocator;
-    var world = ecs.World.init(allocator);
+    var world = try ecs.World.init(allocator);
     defer world.deinit();
 
-    var cmds = Commands.init(allocator, &world);
+    var cmds = Commands.init(allocator, world);
     defer cmds.deinit();
 
     const id1 = try cmds.createEntity(.{Foo{ .x = 1 }});
@@ -93,7 +93,7 @@ test "Commands createEntity" {
 
 test "Commands removeEntity" {
     const allocator = std.testing.allocator;
-    var world = ecs.World.init(allocator);
+    var world = try ecs.World.init(allocator);
     defer world.deinit();
 
     const id1 = try world.entities.createEntity(.{Foo{ .x = 1 }});
@@ -101,7 +101,7 @@ test "Commands removeEntity" {
 
     try std.testing.expect(world.entities.getEntityCount() == 2);
 
-    var cmds = Commands.init(allocator, &world);
+    var cmds = Commands.init(allocator, world);
     defer cmds.deinit();
 
     try cmds.removeEntity(id1);
@@ -114,7 +114,7 @@ test "Commands removeEntity" {
 
 test "Commands addComponents" {
     const allocator = std.testing.allocator;
-    var world = ecs.World.init(allocator);
+    var world = try ecs.World.init(allocator);
     defer world.deinit();
 
     // Define test components
@@ -132,7 +132,7 @@ test "Commands addComponents" {
         try std.testing.expect(e.get(Health) == null);
     }
 
-    var cmds = Commands.init(allocator, &world);
+    var cmds = Commands.init(allocator, world);
     defer cmds.deinit();
 
     // Queue adding components; should be deferred until apply()
@@ -158,7 +158,7 @@ test "Commands addComponents" {
 
 test "Commands removeComponents" {
     const allocator = std.testing.allocator;
-    var world = ecs.World.init(allocator);
+    var world = try ecs.World.init(allocator);
     defer world.deinit();
 
     // Define test components
@@ -176,7 +176,7 @@ test "Commands removeComponents" {
         try std.testing.expect(e.get(Health).?.value == 250);
     }
 
-    var cmds = Commands.init(allocator, &world);
+    var cmds = Commands.init(allocator, world);
     defer cmds.deinit();
 
     // Queue component removals by type
@@ -204,14 +204,14 @@ test "Commands query" {
     const Player = struct {};
 
     const allocator = std.testing.allocator;
-    var world = ecs.World.init(allocator);
+    var world = try ecs.World.init(allocator);
     defer world.deinit();
 
     _ = try world.entities.createEntity(.{Foo{ .x = 10 }});
     _ = try world.entities.createEntity(.{Foo{ .x = 20 }});
     _ = try world.entities.createEntity(.{Player{}});
 
-    var cmds = Commands.init(allocator, &world);
+    var cmds = Commands.init(allocator, world);
     defer cmds.deinit();
 
     var query = try cmds.query(.{Foo});
@@ -234,10 +234,10 @@ test "Commands scope" {
     const Marker = struct {};
 
     const allocator = std.testing.allocator;
-    var world = ecs.World.init(allocator);
+    var world = try ecs.World.init(allocator);
     defer world.deinit();
 
-    var cmds = Commands.init(allocator, &world);
+    var cmds = Commands.init(allocator, world);
     defer cmds.deinit();
 
     var scoped = try cmds.scoped(Marker);
@@ -254,12 +254,12 @@ test "Commands addComponent (singular)" {
     const Health = struct { value: i32 };
 
     const allocator = std.testing.allocator;
-    var world = ecs.World.init(allocator);
+    var world = try ecs.World.init(allocator);
     defer world.deinit();
 
     const id = try world.entities.createEntity(.{Foo{ .x = 99 }});
 
-    var cmds = Commands.init(allocator, &world);
+    var cmds = Commands.init(allocator, world);
     defer cmds.deinit();
 
     try cmds.addComponent(id, Health{ .value = 75 });
@@ -274,12 +274,12 @@ test "Commands removeComponent (singular)" {
     const Health = struct { value: i32 };
 
     const allocator = std.testing.allocator;
-    var world = ecs.World.init(allocator);
+    var world = try ecs.World.init(allocator);
     defer world.deinit();
 
     const id = try world.entities.createEntity(.{ Foo{ .x = 88 }, Health{ .value = 150 } });
 
-    var cmds = Commands.init(allocator, &world);
+    var cmds = Commands.init(allocator, world);
     defer cmds.deinit();
 
     try cmds.removeComponent(id, Health);

@@ -6,7 +6,7 @@ const Health = struct {
 const Player = struct {};
 
 test "System with no params" {
-    var world = World.init(std.testing.allocator);
+    var world = try World.init(std.testing.allocator);
     defer world.deinit();
 
     const system_with_no_params_fn = struct {
@@ -18,7 +18,7 @@ test "System with no params" {
     var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_no_params_fn, &world);
+    try schedule.add(system_with_no_params_fn);
 }
 
 test "System with transaction system param" {
@@ -30,14 +30,14 @@ test "System with transaction system param" {
     }.system_with_tx_param;
 
     const allocator = std.testing.allocator;
-    var world = World.init(allocator);
+    var world = try World.init(allocator);
     defer world.deinit();
 
     var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_tx_param_fn, &world);
-    try schedule.run(&world);
+    try schedule.add(system_with_tx_param_fn);
+    try schedule.run(world);
 
     var query_result = try world.entities.query(.{Player});
     defer query_result.deinit();
@@ -46,7 +46,7 @@ test "System with transaction system param" {
 
 test "System with Query(.{T}) param" {
     const allocator = std.testing.allocator;
-    var world = World.init(allocator);
+    var world = try World.init(allocator);
     defer world.deinit();
 
     // Create one Player entity so the query sees it
@@ -67,13 +67,13 @@ test "System with Query(.{T}) param" {
         }
     }.system_with_query_param;
 
-    try schedule.addWithWorld(system_with_query_param_fn, &world);
-    try schedule.run(&world);
+    try schedule.add(system_with_query_param_fn);
+    try schedule.run(world);
 }
 
 test "System with GroupBy(Trait) param" {
     const allocator = std.testing.allocator;
-    var world = World.init(allocator);
+    var world = try World.init(allocator);
     defer world.deinit();
 
     const ComponentTypeFactory = struct {
@@ -114,13 +114,13 @@ test "System with GroupBy(Trait) param" {
         }
     }.system_with_groupby_param;
 
-    try schedule.addWithWorld(system_with_groupby_param_fn, &world);
-    try schedule.run(&world);
+    try schedule.add(system_with_groupby_param_fn);
+    try schedule.run(world);
 }
 
 test "System with combination of params" {
     const allocator = std.testing.allocator;
-    var world = World.init(allocator);
+    var world = try World.init(allocator);
     defer world.deinit();
 
     // Create one Player entity so the query sees it
@@ -148,8 +148,8 @@ test "System with combination of params" {
     var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_combined_params_fn, &world);
-    try schedule.run(&world);
+    try schedule.add(system_with_combined_params_fn);
+    try schedule.run(world);
 
     const health_res = world.getResource(Health) orelse unreachable;
     try std.testing.expect(health_res.current == 75);
@@ -169,7 +169,7 @@ test "System with Res(T) param" {
     }.system_with_res_param;
 
     const allocator = std.testing.allocator;
-    var world = World.init(allocator);
+    var world = try World.init(allocator);
     defer world.deinit();
 
     try world.insertResource(Health{ .current = 80, .max = 100 });
@@ -177,8 +177,8 @@ test "System with Res(T) param" {
     var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_res_param_fn, &world);
-    try schedule.run(&world);
+    try schedule.add(system_with_res_param_fn);
+    try schedule.run(world);
 }
 
 test "System with ResMut(T) param" {
@@ -191,7 +191,7 @@ test "System with ResMut(T) param" {
     }.system_with_res_param;
 
     const allocator = std.testing.allocator;
-    var world = World.init(allocator);
+    var world = try World.init(allocator);
     defer world.deinit();
 
     try world.insertResource(Health{ .current = 93, .max = 100 });
@@ -199,8 +199,8 @@ test "System with ResMut(T) param" {
     var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_res_param_fn, &world);
-    try schedule.run(&world);
+    try schedule.add(system_with_res_param_fn);
+    try schedule.run(world);
 
     // No entity changes queued; no need to apply commands
 
@@ -210,7 +210,7 @@ test "System with ResMut(T) param" {
 
 test "System with ResOpt(T) param" {
     const allocator = std.testing.allocator;
-    var world = World.init(allocator);
+    var world = try World.init(allocator);
     defer world.deinit();
 
     // No Health resource inserted yet
@@ -225,8 +225,8 @@ test "System with ResOpt(T) param" {
     var schedule = try Schedule.init(allocator, "Test");
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_resopt_param_fn, &world);
-    try schedule.run(&world);
+    try schedule.add(system_with_resopt_param_fn);
+    try schedule.run(world);
 }
 
 // Imports

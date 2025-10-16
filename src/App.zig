@@ -1,16 +1,7 @@
-const std = @import("std");
-
-const root = @import("root.zig");
-const Plugin = root.Plugin;
-const ScheduleManager = root.ScheduleManager;
-const Schedule = root.Schedule;
-const World = root.World;
-const Events = root.Events;
-
 allocator: std.mem.Allocator,
 plugins: std.ArrayListUnmanaged(Plugin) = .empty,
 schedules: ScheduleManager,
-world: World,
+world: *World,
 step_start_schedule_name: []const u8 = "BeginFrame",
 
 const App = @This();
@@ -23,7 +14,7 @@ pub const Exit = struct { code: u8 };
 
 /// Default schedules
 pub fn default(allocator: std.mem.Allocator) !App {
-    var app = App.initEmpty(allocator);
+    var app = try App.initEmpty(allocator);
 
     _ = try app.addSchedule("PreStartup");
     _ = try app.addSchedule("Startup");
@@ -51,12 +42,13 @@ pub fn default(allocator: std.mem.Allocator) !App {
     return app;
 }
 
-pub fn initEmpty(allocator: std.mem.Allocator) App {
+pub fn initEmpty(allocator: std.mem.Allocator) !App {
+    const world = try World.init(allocator);
     return App{
         .allocator = allocator,
         .plugins = .empty,
-        .schedules = ScheduleManager.init(allocator),
-        .world = World.init(allocator),
+        .schedules = ScheduleManager.init(allocator, world),
+        .world = world,
     };
 }
 
@@ -95,7 +87,7 @@ pub fn removeSchedule(self: *App, name: []const u8) !void {
     return self.schedules.removeSchedule(name);
 }
 pub fn addSystem(self: *App, schedule_name: []const u8, comptime system_fn: anytype) !void {
-    try self.schedules.addSystem(schedule_name, system_fn, &self.world);
+    try self.schedules.addSystem(schedule_name, system_fn);
 }
 pub fn scheduleBefore(self: *App, name: []const u8, other: []const u8) !void {
     try self.schedules.scheduleBefore(name, other);
@@ -114,7 +106,7 @@ pub fn runSchedulesFrom(self: *App, start: []const u8) !void {
     var iter = try self.schedules.iterator(start);
     defer iter.deinit();
     while (iter.next()) |schedule| {
-        try schedule.run(&self.world);
+        try schedule.run(self.world);
     }
 }
 
@@ -157,3 +149,13 @@ pub fn removeResource(self: *App, comptime T: type) bool {
 pub fn registerEvent(self: *App, comptime T: type, capacity: usize) !void {
     try self.world.registerEvent(T, capacity);
 }
+
+// Imports
+const std = @import("std");
+
+const root = @import("root.zig");
+const Plugin = root.Plugin;
+const ScheduleManager = root.ScheduleManager;
+const Schedule = root.Schedule;
+const World = root.World;
+const Events = root.Events;

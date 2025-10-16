@@ -1,6 +1,16 @@
 allocator: std.mem.Allocator,
 systems: std.ArrayListUnmanaged(System) = .empty,
 label: []const u8 = "",
+hooks: ?Hooks = null,
+
+pub const Hooks = struct {
+    ptr: *anyopaque,
+    on_added: ?*const fn (p: *anyopaque, system: *const System) anyerror!void = null,
+
+    pub fn callOnAdded(self: *const Hooks, system: *const System) !void {
+        if (self.on_added) |f| try f(self.ptr, system);
+    }
+};
 
 const Schedule = @This();
 
@@ -14,6 +24,12 @@ pub fn init(allocator: std.mem.Allocator, label: []const u8) !Schedule {
     };
 }
 
+pub fn initWithHooks(allocator: std.mem.Allocator, label: []const u8, hooks: Hooks) !Schedule {
+    var schedule = try init(allocator, label);
+    schedule.hooks = hooks;
+    return schedule;
+}
+
 pub fn deinit(self: *Schedule) void {
     if (self.label.len != 0) {
         self.allocator.free(self.label);
@@ -24,11 +40,12 @@ pub fn deinit(self: *Schedule) void {
 }
 
 /// Add a system to the schedule and register it with the world
-pub fn addWithWorld(self: *Schedule, comptime system_fn: anytype, world: *World) !void {
+pub fn add(self: *Schedule, comptime system_fn: anytype) !void {
     const system = try System.from(system_fn);
 
-    // Call the registration function with the world
-    try system.register(world);
+    if (self.hooks) |hooks| {
+        try hooks.callOnAdded(&system);
+    }
 
     try self.systems.append(self.allocator, system);
 }

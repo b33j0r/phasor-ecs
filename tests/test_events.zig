@@ -1,6 +1,6 @@
 test "World registerEvent adds Events(T) resource" {
     const alloc = std.testing.allocator;
-    var world = World.init(alloc);
+    var world = try World.init(alloc);
     defer world.deinit();
 
     try world.registerEvent(i32, 4);
@@ -17,7 +17,7 @@ test "World registerEvent adds Events(T) resource" {
 
 test "EventWriter enqueues into Events(T)" {
     const alloc = std.testing.allocator;
-    var world = World.init(alloc);
+    var world = try World.init(alloc);
     defer world.deinit();
 
     try world.registerEvent(i32, 4);
@@ -31,8 +31,8 @@ test "EventWriter enqueues into Events(T)" {
     var sched = try Schedule.init(alloc, "Test");
     defer sched.deinit();
 
-    try sched.addWithWorld(sys, &world);
-    try sched.run(&world);
+    try sched.add(sys);
+    try sched.run(world);
 
     // Subscribe to read the event
     const events = world.getResource(Events(i32)).?;
@@ -44,7 +44,7 @@ test "EventWriter enqueues into Events(T)" {
 
 test "EventReader drains all queued events" {
     const alloc = std.testing.allocator;
-    var world = World.init(alloc);
+    var world = try World.init(alloc);
     defer world.deinit();
 
     try world.registerEvent(i32, 4);
@@ -69,13 +69,13 @@ test "EventReader drains all queued events" {
     var sched = try Schedule.init(alloc, "Test");
     defer sched.deinit();
 
-    try sched.addWithWorld(sys, &world);
-    try sched.run(&world);
+    try sched.add(sys);
+    try sched.run(world);
 }
 
 test "EventWriter in one system, EventReader in another" {
     const alloc = std.testing.allocator;
-    var world = World.init(alloc);
+    var world = try World.init(alloc);
     defer world.deinit();
 
     try world.registerEvent(i32, 4);
@@ -96,15 +96,15 @@ test "EventWriter in one system, EventReader in another" {
     var sched = try Schedule.init(alloc, "Test");
     defer sched.deinit();
 
-    try sched.addWithWorld(write_sys, &world);
-    try sched.addWithWorld(read_sys, &world);
+    try sched.add(write_sys);
+    try sched.add(read_sys);
 
-    try sched.run(&world);
+    try sched.run(world);
 }
 
 test "EventWriter in one system, EventReaders in two systems" {
     const alloc = std.testing.allocator;
-    var world = World.init(alloc);
+    var world = try World.init(alloc);
     defer world.deinit();
 
     try world.registerEvent(i32, 4);
@@ -132,11 +132,11 @@ test "EventWriter in one system, EventReaders in two systems" {
     var sched = try Schedule.init(alloc, "Test");
     defer sched.deinit();
 
-    try sched.addWithWorld(write_sys, &world);
-    try sched.addWithWorld(read_sys1, &world);
-    try sched.addWithWorld(read_sys2, &world);
+    try sched.add(write_sys);
+    try sched.add(read_sys1);
+    try sched.add(read_sys2);
 
-    try sched.run(&world);
+    try sched.run(world);
 }
 
 // Imports

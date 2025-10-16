@@ -6,17 +6,7 @@ name_to_node: std.StringHashMapUnmanaged(ScheduleGraph.NodeIndex) = .empty,
 id_to_index: std.AutoHashMapUnmanaged(u32, u32) = .empty,
 // Next stable schedule ID to assign
 next_id: u32 = 0,
-
-const std = @import("std");
-
-const root = @import("root.zig");
-const Schedule = root.Schedule;
-const World = root.World;
-
-const phasor_graph = @import("phasor-graph");
-const Graph = phasor_graph.Graph;
-
-const ScheduleManager = @This();
+world: *World,
 
 /// Edge type carries no data for schedule ordering
 pub const Relationship = void;
@@ -30,7 +20,7 @@ pub const Error = error{
     CyclicDependency,
 };
 
-pub fn init(allocator: std.mem.Allocator) ScheduleManager {
+pub fn init(allocator: std.mem.Allocator, world: *World) ScheduleManager {
     return ScheduleManager{
         .allocator = allocator,
         .graph = ScheduleGraph.init(allocator),
@@ -38,6 +28,7 @@ pub fn init(allocator: std.mem.Allocator) ScheduleManager {
         .name_to_node = .empty,
         .id_to_index = .empty,
         .next_id = 0,
+        .world = world,
     };
 }
 
@@ -53,6 +44,11 @@ pub fn deinit(self: *ScheduleManager) void {
     self.graph.deinit();
 }
 
+fn onSystemAdded(this: *anyopaque, system: *const System) !void {
+    const self: *ScheduleManager = @ptrCast(@alignCast(this));
+    try system.register(self.world);
+}
+
 pub fn addSchedule(self: *ScheduleManager, name: []const u8) !*Schedule {
     if (self.name_to_node.get(name)) |_| {
         // return existing schedule pointer
@@ -63,7 +59,10 @@ pub fn addSchedule(self: *ScheduleManager, name: []const u8) !*Schedule {
         return &self.schedules.items[idx];
     }
     // create schedule and add to list
-    const schedule = try Schedule.init(self.allocator, name);
+    const schedule = try Schedule.initWithHooks(self.allocator, name, .{
+        .ptr = self,
+        .on_added = &ScheduleManager.onSystemAdded,
+    });
     try self.schedules.append(self.allocator, schedule);
     const idx_u32_now: u32 = @intCast(self.schedules.items.len - 1);
     const id = self.next_id;
@@ -133,12 +132,12 @@ pub fn addScheduleBetween(self: *ScheduleManager, name: []const u8, first: []con
     return sched;
 }
 
-pub fn addSystem(self: *ScheduleManager, schedule_name: []const u8, comptime system_fn: anytype, world: *World) !void {
+pub fn addSystem(self: *ScheduleManager, schedule_name: []const u8, comptime system_fn: anytype) !void {
     const node = self.name_to_node.get(schedule_name) orelse return Error.ScheduleNotFound;
     const id = self.graph.getNodeWeight(node);
     const idx_u32 = self.id_to_index.get(id) orelse return Error.ScheduleNotFound;
     const idx: usize = @intCast(idx_u32);
-    try self.schedules.items[idx].addWithWorld(system_fn, world);
+    try self.schedules.items[idx].add(system_fn);
 }
 
 pub const ScheduleIterator = struct {
@@ -174,3 +173,16 @@ pub fn iterator(self: *ScheduleManager, startNode: []const u8) !ScheduleIterator
     }
     return ScheduleIterator.init(self, result);
 }
+
+// Imports
+const std = @import("std");
+
+const root = @import("root.zig");
+const Schedule = root.Schedule;
+const World = root.World;
+const System = root.System;
+
+const phasor_graph = @import("phasor-graph");
+const Graph = phasor_graph.Graph;
+
+const ScheduleManager = @This();

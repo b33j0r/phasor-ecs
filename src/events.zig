@@ -106,7 +106,6 @@ pub fn EventReader(comptime T: type) type {
             const events = world.getResource(Events(T));
             if (events == null) return error.EventMustBeRegistered;
 
-            // TODO: don't get from commands
             var registry = &world.subscriptions;
 
             // Generate unique key for this system + event type combo

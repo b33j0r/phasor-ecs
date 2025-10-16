@@ -256,7 +256,7 @@ test "resourceId function consistency" {
 }
 
 test "ResourceManager integration with World" {
-    var world = World.init(testing.allocator);
+    var world = try World.init(testing.allocator);
     defer world.deinit();
 
     // Test World resource methods
@@ -314,7 +314,7 @@ const ResourcePlayerStats = struct {
 
 test "Resource management memory leak" {
     const allocator = testing.allocator;
-    var world = World.init(allocator);
+    var world = try World.init(allocator);
     defer world.deinit();
 
     const num_cycles = 100;
@@ -340,7 +340,7 @@ test "Resource management memory leak" {
 }
 
 test "insertResource with ZST" {
-    var world = World.init(testing.allocator);
+    var world = try World.init(testing.allocator);
     defer world.deinit();
 
     try world.insertResource(GameMarker{});

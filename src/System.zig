@@ -16,6 +16,7 @@ pub fn from(comptime system_fn: anytype) !System {
             inline for (std.meta.fields(ArgsTupleType)) |field| {
                 const ParamType = field.type;
                 const param_type_info = @typeInfo(ParamType);
+                std.debug.print("Registering system: {s}\n", .{@typeName(@TypeOf(system_fn))});
                 if (param_type_info == .@"struct" or param_type_info == .@"union" or param_type_info == .@"enum") {
                     if (@hasDecl(ParamType, "register_system_param")) {
                         try ParamType.register_system_param(system_fn, world);
