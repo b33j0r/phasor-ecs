@@ -26,7 +26,7 @@ pub fn deinit(self: *Schedule) void {
 }
 
 /// Add a system to the schedule and register it with the world
-pub fn addWithWorld(self: *Schedule, comptime system_fn: anytype) !void {
+pub fn add(self: *Schedule, comptime system_fn: anytype) !void {
     const system = try System.from(system_fn);
 
     // Call the registration function with the world

@@ -31,7 +31,7 @@ test "EventWriter enqueues into Events(T)" {
     var sched = try Schedule.init(alloc, "Test", world);
     defer sched.deinit();
 
-    try sched.addWithWorld(sys);
+    try sched.add(sys);
     try sched.run(world);
 
     // Subscribe to read the event
@@ -69,7 +69,7 @@ test "EventReader drains all queued events" {
     var sched = try Schedule.init(alloc, "Test", world);
     defer sched.deinit();
 
-    try sched.addWithWorld(sys);
+    try sched.add(sys);
     try sched.run(world);
 }
 
@@ -96,8 +96,8 @@ test "EventWriter in one system, EventReader in another" {
     var sched = try Schedule.init(alloc, "Test", world);
     defer sched.deinit();
 
-    try sched.addWithWorld(write_sys);
-    try sched.addWithWorld(read_sys);
+    try sched.add(write_sys);
+    try sched.add(read_sys);
 
     try sched.run(world);
 }
@@ -132,9 +132,9 @@ test "EventWriter in one system, EventReaders in two systems" {
     var sched = try Schedule.init(alloc, "Test", world);
     defer sched.deinit();
 
-    try sched.addWithWorld(write_sys);
-    try sched.addWithWorld(read_sys1);
-    try sched.addWithWorld(read_sys2);
+    try sched.add(write_sys);
+    try sched.add(read_sys1);
+    try sched.add(read_sys2);
 
     try sched.run(world);
 }

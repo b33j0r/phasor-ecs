@@ -18,7 +18,7 @@ test "System with no params" {
     var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_no_params_fn);
+    try schedule.add(system_with_no_params_fn);
 }
 
 test "System with transaction system param" {
@@ -36,7 +36,7 @@ test "System with transaction system param" {
     var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_tx_param_fn);
+    try schedule.add(system_with_tx_param_fn);
     try schedule.run(world);
 
     var query_result = try world.entities.query(.{Player});
@@ -67,7 +67,7 @@ test "System with Query(.{T}) param" {
         }
     }.system_with_query_param;
 
-    try schedule.addWithWorld(system_with_query_param_fn);
+    try schedule.add(system_with_query_param_fn);
     try schedule.run(world);
 }
 
@@ -114,7 +114,7 @@ test "System with GroupBy(Trait) param" {
         }
     }.system_with_groupby_param;
 
-    try schedule.addWithWorld(system_with_groupby_param_fn);
+    try schedule.add(system_with_groupby_param_fn);
     try schedule.run(world);
 }
 
@@ -148,7 +148,7 @@ test "System with combination of params" {
     var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_combined_params_fn);
+    try schedule.add(system_with_combined_params_fn);
     try schedule.run(world);
 
     const health_res = world.getResource(Health) orelse unreachable;
@@ -177,7 +177,7 @@ test "System with Res(T) param" {
     var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_res_param_fn);
+    try schedule.add(system_with_res_param_fn);
     try schedule.run(world);
 }
 
@@ -199,7 +199,7 @@ test "System with ResMut(T) param" {
     var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_res_param_fn);
+    try schedule.add(system_with_res_param_fn);
     try schedule.run(world);
 
     // No entity changes queued; no need to apply commands
@@ -225,7 +225,7 @@ test "System with ResOpt(T) param" {
     var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_resopt_param_fn);
+    try schedule.add(system_with_resopt_param_fn);
     try schedule.run(world);
 }
 

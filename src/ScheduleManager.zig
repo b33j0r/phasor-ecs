@@ -140,7 +140,7 @@ pub fn addSystem(self: *ScheduleManager, schedule_name: []const u8, comptime sys
     const id = self.graph.getNodeWeight(node);
     const idx_u32 = self.id_to_index.get(id) orelse return Error.ScheduleNotFound;
     const idx: usize = @intCast(idx_u32);
-    try self.schedules.items[idx].addWithWorld(system_fn);
+    try self.schedules.items[idx].add(system_fn);
 }
 
 pub const ScheduleIterator = struct {
