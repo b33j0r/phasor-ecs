@@ -229,6 +229,41 @@ test "System with ResOpt(T) param" {
     try schedule.run(world);
 }
 
+test "ScheduleManager reuses cached topological order until graph changes" {
+    const allocator = std.testing.allocator;
+
+    var world = try World.init(allocator);
+    defer world.deinit();
+
+    var manager = ScheduleManager.init(allocator, world);
+    defer manager.deinit();
+
+    _ = try manager.addSchedule("A");
+    _ = try manager.addSchedule("B");
+    try manager.scheduleBefore("A", "B");
+
+    var iter1 = try manager.iterator("A");
+    defer iter1.deinit();
+    try std.testing.expect(manager.topo_cache.count() == 1);
+
+    const cached_entry = manager.topo_cache.getEntry("A").?;
+    try std.testing.expectEqual(manager.graph.version(), cached_entry.value_ptr.version);
+
+    var iter2 = try manager.iterator("A");
+    defer iter2.deinit();
+    try std.testing.expect(iter2.topo.order.len == iter1.topo.order.len);
+    try std.testing.expect(manager.topo_cache.count() == 1);
+
+    _ = try manager.addSchedule("C");
+    try manager.scheduleAfter("C", "A");
+
+    var iter3 = try manager.iterator("A");
+    defer iter3.deinit();
+    const updated_entry = manager.topo_cache.getEntry("A").?;
+    try std.testing.expectEqual(manager.graph.version(), updated_entry.value_ptr.version);
+    try std.testing.expect(updated_entry.value_ptr.order.len == iter3.topo.order.len);
+}
+
 // Imports
 const std = @import("std");
 
@@ -238,6 +273,7 @@ const Res = ecs.Res;
 const ResMut = ecs.ResMut;
 const ResOpt = ecs.ResOpt;
 const Schedule = ecs.Schedule;
+const ScheduleManager = ecs.ScheduleManager;
 const System = ecs.System;
 const Without = ecs.Without;
 const GroupBy = ecs.GroupBy;

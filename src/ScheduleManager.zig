@@ -2,6 +2,7 @@ allocator: std.mem.Allocator,
 graph: ScheduleGraph,
 schedules: std.ArrayListUnmanaged(Schedule) = .empty,
 name_to_node: std.StringHashMapUnmanaged(ScheduleGraph.NodeIndex) = .empty,
+topo_cache: std.StringHashMapUnmanaged(CachedTopo) = .empty,
 // Map stable schedule IDs -> dense schedules array indices
 id_to_index: std.AutoHashMapUnmanaged(u32, u32) = .empty,
 // Next stable schedule ID to assign
@@ -25,6 +26,14 @@ pub const Relationship = void;
 /// Use schedule indices (u32) as node weights
 pub const ScheduleGraph = Graph(u32, Relationship, null);
 
+/// Cached topological sort result
+const CachedTopo = struct {
+    version: ScheduleGraph.GraphVersion,
+    has_cycles: bool,
+    order: []ScheduleGraph.NodeIndex,
+};
+
+/// Errors for ScheduleManager operations
 pub const Error = error{
     ScheduleAlreadyExists,
     ScheduleNotFound,
@@ -37,6 +46,7 @@ pub fn init(allocator: std.mem.Allocator, world: *World) ScheduleManager {
         .graph = ScheduleGraph.init(allocator),
         .schedules = .empty,
         .name_to_node = .empty,
+        .topo_cache = .empty,
         .id_to_index = .empty,
         .next_id = 0,
         .world = world,
@@ -51,6 +61,8 @@ pub fn deinit(self: *ScheduleManager) void {
     self.name_to_node.deinit(self.allocator);
     // deinit id map
     self.id_to_index.deinit(self.allocator);
+    // deinit topo cache
+    self.clearTopoCache();
     // deinit graph
     self.graph.deinit();
 }
@@ -87,6 +99,12 @@ pub fn removeSchedule(self: *ScheduleManager, name: []const u8) !void {
     // 1) Remove from name map BEFORE deinit, because the map stores a slice into schedule.label.
     _ = self.name_to_node.remove(name);
 
+    // 1.b) Free cached topo if exists
+    if (self.topo_cache.getEntry(name)) |entry| {
+        self.freeCachedTopo(entry.value_ptr);
+        _ = self.topo_cache.remove(name);
+    }
+
     // 2) Remove node from graph and id->index map
     _ = try self.graph.removeNode(node);
     _ = self.id_to_index.remove(id);
@@ -110,6 +128,21 @@ pub fn removeSchedule(self: *ScheduleManager, name: []const u8) !void {
 
     // Shrink the array (do not deinit the moved schedule)
     _ = self.schedules.pop();
+}
+
+fn freeCachedTopo(self: *ScheduleManager, cached: *CachedTopo) void {
+    if (!cached.has_cycles) {
+        self.allocator.free(cached.order);
+    }
+}
+
+fn clearTopoCache(self: *ScheduleManager) void {
+    var it = self.topo_cache.iterator();
+    while (it.next()) |entry| {
+        self.freeCachedTopo(entry.value_ptr);
+    }
+    self.topo_cache.deinit(self.allocator);
+    self.topo_cache = .empty;
 }
 
 pub fn scheduleBefore(self: *ScheduleManager, name: []const u8, other: []const u8) !void {
@@ -169,10 +202,78 @@ pub const ScheduleIterator = struct {
 
 pub fn iterator(self: *ScheduleManager, startNode: []const u8) !ScheduleIterator {
     const start = self.name_to_node.get(startNode) orelse return Error.ScheduleNotFound;
+
+    const start_id = self.graph.getNodeWeight(start);
+    const start_idx_u32 = self.id_to_index.get(start_id).?;
+    const start_idx: usize = @intCast(start_idx_u32);
+    const key = self.schedules.items[start_idx].label;
+    const current_version = self.graph.version();
+
+    if (self.topo_cache.getEntry(key)) |entry| {
+        if (entry.value_ptr.version == current_version) {
+            if (entry.value_ptr.has_cycles) {
+                return Error.CyclicDependency;
+            }
+
+            const cached_order = entry.value_ptr.order;
+            const order_copy = try self.allocator.alloc(ScheduleGraph.NodeIndex, cached_order.len);
+            @memcpy(order_copy, cached_order);
+            return ScheduleIterator.init(self, ScheduleGraph.TopologicalSortResult{
+                .order = order_copy,
+                .has_cycles = false,
+                .allocator = self.allocator,
+            });
+        }
+    }
+
     var result = try self.graph.topologicalSortFrom(self.allocator, start);
     if (result.has_cycles) {
-        result.deinit();
+        defer result.deinit();
+        if (self.topo_cache.getEntry(key)) |entry| {
+            self.freeCachedTopo(entry.value_ptr);
+            entry.value_ptr.* = CachedTopo{
+                .version = current_version,
+                .has_cycles = true,
+                .order = &[_]ScheduleGraph.NodeIndex{},
+            };
+        } else {
+            try self.topo_cache.put(self.allocator, key, CachedTopo{
+                .version = current_version,
+                .has_cycles = true,
+                .order = &[_]ScheduleGraph.NodeIndex{},
+            });
+        }
         return Error.CyclicDependency;
     }
-    return ScheduleIterator.init(self, result);
+
+    const cached_copy = try self.allocator.alloc(ScheduleGraph.NodeIndex, result.order.len);
+    errdefer self.allocator.free(cached_copy);
+    @memcpy(cached_copy, result.order);
+
+    if (self.topo_cache.getEntry(key)) |entry| {
+        self.freeCachedTopo(entry.value_ptr);
+        entry.value_ptr.* = CachedTopo{
+            .version = current_version,
+            .has_cycles = false,
+            .order = cached_copy,
+        };
+    } else {
+        try self.topo_cache.put(self.allocator, key, CachedTopo{
+            .version = current_version,
+            .has_cycles = false,
+            .order = cached_copy,
+        });
+    }
+
+    // Free the original allocation and return an iterator using a separate copy so
+    // the cache keeps ownership of cached_copy.
+    self.allocator.free(result.order);
+
+    const order_copy = try self.allocator.alloc(ScheduleGraph.NodeIndex, cached_copy.len);
+    @memcpy(order_copy, cached_copy);
+    return ScheduleIterator.init(self, ScheduleGraph.TopologicalSortResult{
+        .order = order_copy,
+        .has_cycles = false,
+        .allocator = self.allocator,
+    });
 }
