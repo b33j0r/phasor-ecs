@@ -139,6 +139,34 @@ test "EventWriter in one system, EventReaders in two systems" {
     try sched.run(world);
 }
 
+test "EventReader subscription is cleaned up when the schedule is deinit'd" {
+    const alloc = std.testing.allocator;
+    var world = try World.init(alloc);
+    defer world.deinit();
+
+    try world.registerEvent(i32, 4);
+    const events = world.getResource(Events(i32)).?;
+
+    try std.testing.expectEqual(0, events.getSubscriptionCount());
+
+    const read_sys = struct {
+        pub fn f(r: EventReader(i32)) !void {
+            _ = r.tryRecv();
+        }
+    }.f;
+
+    var sched = try Schedule.init(alloc, "Test", world);
+
+    try sched.add(read_sys);
+    try sched.run(world);
+
+    try std.testing.expectEqual(1, events.getSubscriptionCount());
+
+    sched.deinit();
+
+    try std.testing.expectEqual(0, events.getSubscriptionCount());
+}
+
 // Imports
 const std = @import("std");
 

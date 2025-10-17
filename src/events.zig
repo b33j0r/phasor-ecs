@@ -69,6 +69,10 @@ pub fn Events(comptime T: type) type {
             self.sender.close();
             self.controller.close();
         }
+
+        pub fn getSubscriptionCount(self: *Self) usize {
+            return self.controller.getSubscriptionCount();
+        }
     };
 }
 

@@ -21,6 +21,12 @@ pub fn deinit(self: *Schedule) void {
         self.allocator.free(self.label);
         self.label = "";
     }
+    // Unregister all systems
+    for (self.systems.items) |*system| {
+        system.unregister(self.world) catch |err| {
+            std.log.err("Error during system unregistration: {any}", .{err});
+        };
+    }
     self.systems.deinit(self.allocator);
     self.systems = .empty;
 }

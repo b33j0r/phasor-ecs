@@ -1,5 +1,6 @@
 run: *const fn (commands: *Commands) anyerror!void,
 register: *const fn (world: *World) anyerror!void,
+unregister: *const fn (world: *World) anyerror!void,
 
 pub fn from(comptime system_fn: anytype) !System {
     // Validate that system_fn is a function
@@ -65,7 +66,26 @@ pub fn from(comptime system_fn: anytype) !System {
         }
     }.run;
 
-    return System{ .run = runFn, .register = registerFn };
+    const unregisterFn = struct {
+        pub fn unregister(world: *World) !void {
+            const ArgsTupleType = std.meta.ArgsTuple(@TypeOf(system_fn));
+            inline for (std.meta.fields(ArgsTupleType)) |field| {
+                const ParamType = field.type;
+                const param_type_info = @typeInfo(ParamType);
+                if (param_type_info == .@"struct" or param_type_info == .@"union" or param_type_info == .@"enum") {
+                    if (@hasDecl(ParamType, "unregister_system_param")) {
+                        try ParamType.unregister_system_param(system_fn, world);
+                    }
+                }
+            }
+        }
+    }.unregister;
+
+    return System{
+        .run = runFn,
+        .register = registerFn,
+        .unregister = unregisterFn,
+    };
 }
 
 // Imports
