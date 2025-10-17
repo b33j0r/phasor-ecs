@@ -11,14 +11,21 @@ pub fn Graph(comptime NodeType: type, comptime EdgeType: type, comptime StorageT
         pub const Storage = ActualStorage;
         pub const NodeIndex = ActualStorage.NodeIndex;
         pub const EdgeIndex = ActualStorage.EdgeIndex;
+        pub const GraphVersion = u64;
 
         allocator: std.mem.Allocator,
         storage: Storage,
+        graph_version: GraphVersion,
+
+        inline fn bumpVersion(self: *Self) void {
+            self.graph_version +%= 1;
+        }
 
         pub fn init(allocator: std.mem.Allocator) Self {
             return Self{
                 .allocator = allocator,
                 .storage = Storage.init(allocator),
+                .graph_version = 0,
             };
         }
 
@@ -26,16 +33,27 @@ pub fn Graph(comptime NodeType: type, comptime EdgeType: type, comptime StorageT
             self.storage.deinit();
         }
 
+        pub fn version(self: *const Self) GraphVersion {
+            return self.graph_version;
+        }
+
         pub fn addNode(self: *Self, weight: NodeType) !NodeIndex {
-            return self.storage.addNode(weight);
+            const node = try self.storage.addNode(weight);
+            self.bumpVersion();
+            return node;
         }
 
         pub fn removeNode(self: *Self, node: NodeIndex) !void {
-            return self.storage.removeNode(node);
+            try self.storage.removeNode(node);
+            self.bumpVersion();
         }
 
         pub fn addEdge(self: *Self, source: NodeIndex, target: NodeIndex, weight: EdgeType) !bool {
-            return self.storage.addEdge(source, target, weight);
+            const added = try self.storage.addEdge(source, target, weight);
+            if (added) {
+                self.bumpVersion();
+            }
+            return added;
         }
 
         pub fn containsEdge(self: *Self, source: NodeIndex, target: NodeIndex) bool {
@@ -56,6 +74,7 @@ pub fn Graph(comptime NodeType: type, comptime EdgeType: type, comptime StorageT
 
         pub fn setNodeWeight(self: *Self, node: NodeIndex, weight: NodeType) void {
             self.storage.setNodeWeight(node, weight);
+            self.bumpVersion();
         }
 
         /// Get neighbors of a node as a slice

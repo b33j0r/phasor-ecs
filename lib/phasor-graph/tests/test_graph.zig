@@ -241,3 +241,30 @@ test "Graph removeNode first and last and out-of-bounds" {
     // Out-of-bounds remove should error
     try std.testing.expectError(error.IndicesOutOfBounds, g.removeNode(5));
 }
+
+test "Graph version increments on mutations" {
+    const allocator = std.testing.allocator;
+
+    var g = Graph(u32, void, null).init(allocator);
+    defer g.deinit();
+
+    try std.testing.expectEqual(@as(Graph(u32, void, null).GraphVersion, 0), g.version());
+
+    const a = try g.addNode(1);
+    try std.testing.expectEqual(@as(Graph(u32, void, null).GraphVersion, 1), g.version());
+
+    const b = try g.addNode(2);
+    try std.testing.expectEqual(@as(Graph(u32, void, null).GraphVersion, 2), g.version());
+
+    try std.testing.expect(try g.addEdge(a, b, {}));
+    try std.testing.expectEqual(@as(Graph(u32, void, null).GraphVersion, 3), g.version());
+
+    try std.testing.expect(!try g.addEdge(a, b, {}));
+    try std.testing.expectEqual(@as(Graph(u32, void, null).GraphVersion, 3), g.version());
+
+    g.setNodeWeight(a, 5);
+    try std.testing.expectEqual(@as(Graph(u32, void, null).GraphVersion, 4), g.version());
+
+    try g.removeNode(a);
+    try std.testing.expectEqual(@as(Graph(u32, void, null).GraphVersion, 5), g.version());
+}
