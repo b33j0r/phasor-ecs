@@ -31,7 +31,12 @@
     // `zig build --fetch` can be used to fetch all dependencies of a package, recursively.
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
-    .dependencies = .{},
+    .dependencies = .{
+        .phasor_channel = .{
+            .url = "git+https://github.com/b33j0r/phasor-channel#bed3332704d9a6cb733ae0f5b17bae1973876b39",
+            .hash = "phasor_channel-0.0.1-mvQt8bOEAAD-dM1M3dfEsOI64BTytvnxUnkDxd3Y8Amj",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",
