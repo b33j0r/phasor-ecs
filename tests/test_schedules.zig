@@ -15,10 +15,10 @@ test "System with no params" {
 
     const allocator = std.testing.allocator;
 
-    var schedule = try Schedule.init(allocator, "Test");
+    var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_no_params_fn, world);
+    try schedule.addWithWorld(system_with_no_params_fn);
 }
 
 test "System with transaction system param" {
@@ -33,10 +33,10 @@ test "System with transaction system param" {
     var world = try World.init(allocator);
     defer world.deinit();
 
-    var schedule = try Schedule.init(allocator, "Test");
+    var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_tx_param_fn, world);
+    try schedule.addWithWorld(system_with_tx_param_fn);
     try schedule.run(world);
 
     var query_result = try world.entities.query(.{Player});
@@ -52,7 +52,7 @@ test "System with Query(.{T}) param" {
     // Create one Player entity so the query sees it
     _ = try world.entities.createEntity(.{Player{}});
 
-    var schedule = try Schedule.init(allocator, "Test");
+    var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
     const system_with_query_param_fn = struct {
@@ -67,7 +67,7 @@ test "System with Query(.{T}) param" {
         }
     }.system_with_query_param;
 
-    try schedule.addWithWorld(system_with_query_param_fn, world);
+    try schedule.addWithWorld(system_with_query_param_fn);
     try schedule.run(world);
 }
 
@@ -96,7 +96,7 @@ test "System with GroupBy(Trait) param" {
     _ = try world.entities.createEntity(.{Component1{}});
     _ = try world.entities.createEntity(.{Component2{}});
 
-    var schedule = try Schedule.init(allocator, "Test");
+    var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
     const system_with_groupby_param_fn = struct {
@@ -114,7 +114,7 @@ test "System with GroupBy(Trait) param" {
         }
     }.system_with_groupby_param;
 
-    try schedule.addWithWorld(system_with_groupby_param_fn, world);
+    try schedule.addWithWorld(system_with_groupby_param_fn);
     try schedule.run(world);
 }
 
@@ -145,10 +145,10 @@ test "System with combination of params" {
         }
     }.system_with_combined_params;
 
-    var schedule = try Schedule.init(allocator, "Test");
+    var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_combined_params_fn, world);
+    try schedule.addWithWorld(system_with_combined_params_fn);
     try schedule.run(world);
 
     const health_res = world.getResource(Health) orelse unreachable;
@@ -174,10 +174,10 @@ test "System with Res(T) param" {
 
     try world.insertResource(Health{ .current = 80, .max = 100 });
 
-    var schedule = try Schedule.init(allocator, "Test");
+    var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_res_param_fn, world);
+    try schedule.addWithWorld(system_with_res_param_fn);
     try schedule.run(world);
 }
 
@@ -196,10 +196,10 @@ test "System with ResMut(T) param" {
 
     try world.insertResource(Health{ .current = 93, .max = 100 });
 
-    var schedule = try Schedule.init(allocator, "Test");
+    var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_res_param_fn, world);
+    try schedule.addWithWorld(system_with_res_param_fn);
     try schedule.run(world);
 
     // No entity changes queued; no need to apply commands
@@ -222,10 +222,10 @@ test "System with ResOpt(T) param" {
         }
     }.system_with_resopt_param;
 
-    var schedule = try Schedule.init(allocator, "Test");
+    var schedule = try Schedule.init(allocator, "Test", world);
     defer schedule.deinit();
 
-    try schedule.addWithWorld(system_with_resopt_param_fn, world);
+    try schedule.addWithWorld(system_with_resopt_param_fn);
     try schedule.run(world);
 }
 

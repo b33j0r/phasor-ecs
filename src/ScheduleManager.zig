@@ -6,6 +6,7 @@ name_to_node: std.StringHashMapUnmanaged(ScheduleGraph.NodeIndex) = .empty,
 id_to_index: std.AutoHashMapUnmanaged(u32, u32) = .empty,
 // Next stable schedule ID to assign
 next_id: u32 = 0,
+world: *World,
 
 const std = @import("std");
 
@@ -30,7 +31,7 @@ pub const Error = error{
     CyclicDependency,
 };
 
-pub fn init(allocator: std.mem.Allocator) ScheduleManager {
+pub fn init(allocator: std.mem.Allocator, world: *World) ScheduleManager {
     return ScheduleManager{
         .allocator = allocator,
         .graph = ScheduleGraph.init(allocator),
@@ -38,6 +39,7 @@ pub fn init(allocator: std.mem.Allocator) ScheduleManager {
         .name_to_node = .empty,
         .id_to_index = .empty,
         .next_id = 0,
+        .world = world,
     };
 }
 
@@ -63,7 +65,7 @@ pub fn addSchedule(self: *ScheduleManager, name: []const u8) !*Schedule {
         return &self.schedules.items[idx];
     }
     // create schedule and add to list
-    const schedule = try Schedule.init(self.allocator, name);
+    const schedule = try Schedule.init(self.allocator, name, self.world);
     try self.schedules.append(self.allocator, schedule);
     const idx_u32_now: u32 = @intCast(self.schedules.items.len - 1);
     const id = self.next_id;
@@ -133,12 +135,12 @@ pub fn addScheduleBetween(self: *ScheduleManager, name: []const u8, first: []con
     return sched;
 }
 
-pub fn addSystem(self: *ScheduleManager, schedule_name: []const u8, comptime system_fn: anytype, world: *World) !void {
+pub fn addSystem(self: *ScheduleManager, schedule_name: []const u8, comptime system_fn: anytype) !void {
     const node = self.name_to_node.get(schedule_name) orelse return Error.ScheduleNotFound;
     const id = self.graph.getNodeWeight(node);
     const idx_u32 = self.id_to_index.get(id) orelse return Error.ScheduleNotFound;
     const idx: usize = @intCast(idx_u32);
-    try self.schedules.items[idx].addWithWorld(system_fn, world);
+    try self.schedules.items[idx].addWithWorld(system_fn);
 }
 
 pub const ScheduleIterator = struct {

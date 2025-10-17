@@ -1,16 +1,18 @@
 allocator: std.mem.Allocator,
 systems: std.ArrayListUnmanaged(System) = .empty,
 label: []const u8 = "",
+world: *World,
 
 const Schedule = @This();
 
-pub fn init(allocator: std.mem.Allocator, label: []const u8) !Schedule {
+pub fn init(allocator: std.mem.Allocator, label: []const u8, world: *World) !Schedule {
     // duplicate label to own memory; freed in deinit
     const owned = try allocator.dupe(u8, label);
     return Schedule{
         .allocator = allocator,
         .systems = .empty,
         .label = owned,
+        .world = world,
     };
 }
 
@@ -24,11 +26,11 @@ pub fn deinit(self: *Schedule) void {
 }
 
 /// Add a system to the schedule and register it with the world
-pub fn addWithWorld(self: *Schedule, comptime system_fn: anytype, world: *World) !void {
+pub fn addWithWorld(self: *Schedule, comptime system_fn: anytype) !void {
     const system = try System.from(system_fn);
 
     // Call the registration function with the world
-    try system.register(world);
+    try system.register(self.world);
 
     try self.systems.append(self.allocator, system);
 }

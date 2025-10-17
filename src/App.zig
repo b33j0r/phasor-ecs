@@ -43,11 +43,12 @@ pub fn default(allocator: std.mem.Allocator) !App {
 }
 
 pub fn initEmpty(allocator: std.mem.Allocator) !App {
+    const world = try World.init(allocator);
     return App{
         .allocator = allocator,
         .plugins = .empty,
-        .schedules = ScheduleManager.init(allocator),
-        .world = try World.init(allocator),
+        .schedules = ScheduleManager.init(allocator, world),
+        .world = world,
     };
 }
 
@@ -86,7 +87,7 @@ pub fn removeSchedule(self: *App, name: []const u8) !void {
     return self.schedules.removeSchedule(name);
 }
 pub fn addSystem(self: *App, schedule_name: []const u8, comptime system_fn: anytype) !void {
-    try self.schedules.addSystem(schedule_name, system_fn, self.world);
+    try self.schedules.addSystem(schedule_name, system_fn);
 }
 pub fn scheduleBefore(self: *App, name: []const u8, other: []const u8) !void {
     try self.schedules.scheduleBefore(name, other);
