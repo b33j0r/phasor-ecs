@@ -13,19 +13,22 @@ const SubscriptionManager = root.SubscriptionManager;
 
 const World = @This();
 
-pub fn init(allocator: std.mem.Allocator) World {
-    return World{
+pub fn init(allocator: std.mem.Allocator) !*World {
+    const world = try allocator.create(World);
+    world.* = World{
         .allocator = allocator,
         .entities = Database.init(allocator),
         .resources = ResourceManager.init(allocator),
         .subscriptions = SubscriptionManager.init(allocator),
     };
+    return world;
 }
 
 pub fn deinit(self: *World) void {
     self.entities.deinit();
     self.resources.deinit();
     self.subscriptions.deinit();
+    self.allocator.destroy(self);
 }
 
 pub fn commands(self: *World) Commands {
