@@ -1,4 +1,4 @@
-test "Bundle Entity.get works with arbitrary structs" {
+test "Bundle Entity.getAlloc works with arbitrary structs" {
     const allocator = std.testing.allocator;
     var db = phasor_db.Database.init(allocator);
     defer db.deinit();
