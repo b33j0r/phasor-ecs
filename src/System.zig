@@ -96,4 +96,3 @@ const Commands = root.Commands;
 const Scoped = root.Scoped;
 const System = root.System;
 const World = root.World;
-const SubscriptionManager = root.SubscriptionManager;

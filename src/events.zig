@@ -8,7 +8,6 @@ const phasor_channel = @import("phasor-channel");
 const root = @import("root.zig");
 const World = root.World;
 const Commands = root.Commands;
-const SubscriptionManager = root.SubscriptionManager;
 
 pub fn Events(comptime T: type) type {
     return struct {
@@ -17,9 +16,14 @@ pub fn Events(comptime T: type) type {
 
         sender: Channel.Sender,
         controller: Channel.Controller,
+        // Per-Events subscription registry (per-world)
+        subs: std.AutoHashMap(u64, SubscriptionEntry),
+        mutex: std.Thread.Mutex = .{},
 
         const Channel = phasor_channel.BroadcastChannel(T);
         const Self = @This();
+
+        const SubscriptionEntry = struct { ptr: *anyopaque, deinit_fn: *const fn (*anyopaque) void };
 
         pub const Error = error{
             QueueClosed,
@@ -33,10 +37,20 @@ pub fn Events(comptime T: type) type {
                 .cap = capacity,
                 .sender = channel_pair.sender,
                 .controller = channel_pair.controller,
+                .subs = std.AutoHashMap(u64, SubscriptionEntry).init(allocator),
             };
         }
 
         pub fn deinit(self: *Self) void {
+            // Clean up all subscriptions first
+            self.mutex.lock();
+            var it = self.subs.valueIterator();
+            while (it.next()) |entry| {
+                entry.deinit_fn(entry.ptr);
+            }
+            self.subs.deinit();
+            self.mutex.unlock();
+
             self.sender.deinit();
             self.controller.deinit();
         }
@@ -73,6 +87,44 @@ pub fn Events(comptime T: type) type {
         pub fn getSubscriptionCount(self: *Self) usize {
             return self.controller.getSubscriptionCount();
         }
+
+        /// Generate a unique key for a system function + this event type
+        pub fn makeKey(comptime system_fn: anytype) u64 {
+            const system_ptr = @intFromPtr(&system_fn);
+            const type_hash = comptime blk: {
+                const name = @typeName(T);
+                var hash: u64 = 0;
+                for (name) |c| hash = hash *% 31 +% c;
+                break :blk hash;
+            };
+            return system_ptr ^ type_hash;
+        }
+
+        /// Store a subscription for a given key with its cleanup function
+        pub fn store(self: *Self, key: u64, subscription: *anyopaque, deinit_fn: *const fn (*anyopaque) void) !void {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            try self.subs.put(key, .{ .ptr = subscription, .deinit_fn = deinit_fn });
+        }
+
+        /// Retrieve a subscription for a given key
+        pub fn get(self: *Self, key: u64) ?*anyopaque {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            if (self.subs.get(key)) |entry| return entry.ptr;
+            return null;
+        }
+
+        /// Remove and cleanup a subscription for a given key
+        pub fn remove(self: *Self, key: u64) bool {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            if (self.subs.fetchRemove(key)) |kv| {
+                kv.value.deinit_fn(kv.value.ptr);
+                return true;
+            }
+            return false;
+        }
     };
 }
 
@@ -105,19 +157,15 @@ pub fn EventReader(comptime T: type) type {
 
         const Self = @This();
 
-        /// One-time initialization per system - creates and stores subscription in registry
+        /// One-time initialization per system - creates and stores subscription in the owning Events(T)
         pub fn register_system_param(comptime system_fn: anytype, world: *World) !void {
-            const events = world.getResource(Events(T));
-            if (events == null) return error.EventMustBeRegistered;
-
-            // TODO: don't get from commands
-            var registry = &world.subscriptions;
+            const events = world.getResource(Events(T)) orelse return error.EventMustBeRegistered;
 
             // Generate unique key for this system + event type combo
-            const key = SubscriptionManager.makeKey(system_fn, T);
+            const key = Events(T).makeKey(system_fn);
 
             // Check if already subscribed
-            if (registry.get(key)) |_| {
+            if (events.get(key)) |_| {
                 return; // Already initialized
             }
 
@@ -132,7 +180,7 @@ pub fn EventReader(comptime T: type) type {
             errdefer alloc.destroy(wrapper_ptr);
 
             wrapper_ptr.* = .{
-                .receiver = try events.?.subscribe(),
+                .receiver = try events.subscribe(),
                 .allocator = alloc,
             };
 
@@ -146,23 +194,22 @@ pub fn EventReader(comptime T: type) type {
                 }
             }.cleanup;
 
-            // Store in registry with cleanup function
-            try registry.store(key, @ptrCast(wrapper_ptr), cleanupFn);
+            // Store in events registry with cleanup function
+            try events.store(key, @ptrCast(wrapper_ptr), cleanupFn);
         }
 
-        /// Per-frame initialization - looks up subscription from registry
+        /// Per-frame initialization - looks up subscription from the owning Events(T)
         pub fn init_system_param(self: *Self, comptime system_fn: anytype, commands: *Commands) !void {
             const Wrapper = struct {
                 receiver: Events(T).Channel.Receiver,
                 allocator: std.mem.Allocator,
             };
 
-            // TODO: don't get from commands
-            var registry = &commands.world.subscriptions;
+            const events = commands.getResource(Events(T)) orelse return error.EventMustBeRegistered;
 
-            const key = SubscriptionManager.makeKey(system_fn, T);
+            const key = Events(T).makeKey(system_fn);
 
-            const wrapper_opaque = registry.get(key) orelse
+            const wrapper_opaque = events.get(key) orelse
                 return error.EventReaderNotSubscribed;
 
             const wrapper: *Wrapper = @ptrCast(@alignCast(wrapper_opaque));
@@ -172,6 +219,13 @@ pub fn EventReader(comptime T: type) type {
         pub fn deinit(self: *Self) void {
             // Don't deinit the receiver - it's owned by the registry
             self.receiver = null;
+        }
+
+        /// Automatic cleanup hook: ECS calls when system removed or schedule deinitialized
+        pub fn unregister_system_param(comptime system_fn: anytype, world: *World) !void {
+            const events = world.getResource(Events(T)) orelse return; // If events gone, nothing to clean
+            const key = Events(T).makeKey(system_fn);
+            _ = events.remove(key);
         }
 
         pub fn recv(self: Self) !T {

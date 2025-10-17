@@ -41,6 +41,32 @@ pub fn add(self: *Schedule, comptime system_fn: anytype) !void {
     try self.systems.append(self.allocator, system);
 }
 
+/// Get the index of a system in the schedule by its function
+pub fn getSystemIndex(self: *const Schedule, comptime system_fn: anytype) ?usize {
+    // Build a temporary System for comparison
+    const target = System.from(system_fn) catch return null;
+    for (self.systems.items, 0..) |system, idx| {
+        if (system.run == target.run) {
+            return idx;
+        }
+    }
+    return null;
+}
+
+/// Remove a system from the schedule and unregister it from the world
+pub fn remove(self: *Schedule, comptime system_fn: anytype) !void {
+    const idx = self.getSystemIndex(system_fn) orelse return;
+
+    const system = self.systems.items[idx];
+
+    // Unregister the system from the world
+    try system.unregister(self.world);
+
+    // Remove the system from the schedule
+    _ = self.systems.swapRemove(idx);
+}
+
+/// Run all systems in the schedule
 pub fn run(self: *const Schedule, world: *World) !void {
     for (self.systems.items) |system| {
         var commands = world.commands();
