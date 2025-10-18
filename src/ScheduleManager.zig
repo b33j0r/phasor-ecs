@@ -90,6 +90,14 @@ pub fn addSchedule(self: *ScheduleManager, name: []const u8) !*Schedule {
     return &self.schedules.items[idx_u32_now];
 }
 
+pub fn getSchedule(self: *ScheduleManager, name: []const u8) ?*Schedule {
+    const node = self.name_to_node.get(name) orelse return null;
+    const id = self.graph.getNodeWeight(node);
+    const idx_u32 = self.id_to_index.get(id) orelse return null;
+    const idx: usize = @intCast(idx_u32);
+    return &self.schedules.items[idx];
+}
+
 pub fn removeSchedule(self: *ScheduleManager, name: []const u8) !void {
     const node = self.name_to_node.get(name) orelse return Error.ScheduleNotFound;
     const id = self.graph.getNodeWeight(node);
