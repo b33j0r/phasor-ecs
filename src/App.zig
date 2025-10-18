@@ -1,3 +1,5 @@
+//! The top-level application structure managing plugins, schedules, and the world.
+
 allocator: std.mem.Allocator,
 plugins: std.ArrayListUnmanaged(Plugin) = .empty,
 schedules: ScheduleManager,
@@ -88,6 +90,9 @@ pub fn removeSchedule(self: *App, name: []const u8) !void {
 }
 pub fn addSystem(self: *App, schedule_name: []const u8, comptime system_fn: anytype) !void {
     try self.schedules.addSystem(schedule_name, system_fn);
+}
+pub fn removeSystem(self: *App, schedule_name: []const u8, comptime system_fn: anytype) !void {
+    try self.schedules.removeSystem(schedule_name, system_fn);
 }
 pub fn scheduleBefore(self: *App, name: []const u8, other: []const u8) !void {
     try self.schedules.scheduleBefore(name, other);

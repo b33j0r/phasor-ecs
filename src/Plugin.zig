@@ -1,13 +1,7 @@
 //! Inspired by Bevy's Plugin system: a plugin encapsulates setup logic
 //! (adding systems, resources, etc) and participates in the app lifecycle.
 //!
-//! - `is_unique` controls whether the same plugin type can be added multiple times.
-//! - Ownership is explicit: use `fromInstance` if you keep the instance,
-//!   or `fromOwned` if you want the app to own and destroy it.
-
-const std = @import("std");
-const root = @import("root.zig");
-const App = root.App;
+//! `is_unique` controls whether the same plugin type can be added multiple times.
 
 const Plugin = @This();
 
@@ -107,3 +101,8 @@ pub fn cleanup(self: *const Plugin, app: *App) !void {
 pub fn deinit(self: *Plugin) void {
     self.vtable.destroy(self.allocator, self.self_ptr);
 }
+
+// Imports
+const std = @import("std");
+const root = @import("root.zig");
+const App = root.App;

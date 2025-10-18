@@ -204,6 +204,28 @@ test "App removed schedules are actually removed" {
     cleanupRecorder(&app);
 }
 
+test "App removed systems are actually removed" {
+    const allocator = std.testing.allocator;
+    var app = try App.default(allocator);
+    defer app.deinit();
+
+    try app.insertResource(Recorder{});
+
+    try app.addSystem("Update", appendMark("update"));
+    try app.addSystem("Render", appendMark("render"));
+
+    // Remove the Update system before running
+    try app.removeSystem("Update", appendMark("update"));
+
+    _ = try app.step();
+
+    const rec = app.world.getResource(Recorder).?;
+    try std.testing.expectEqual(@as(usize, 1), rec.log.items.len);
+    try std.testing.expect(std.mem.eql(u8, rec.log.items[0], "render"));
+
+    cleanupRecorder(&app);
+}
+
 test "App scoped commands" {
     const allocator = std.testing.allocator;
     var app = try App.default(allocator);
