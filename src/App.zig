@@ -85,6 +85,9 @@ pub fn addPlugin(self: *App, plugin_or_ptr: anytype) !void {
 pub fn addSchedule(self: *App, name: []const u8) !*Schedule {
     return try self.schedules.addSchedule(name);
 }
+pub fn getSchedule(self: *App, name: []const u8) ?*Schedule {
+    return self.schedules.getSchedule(name);
+}
 pub fn removeSchedule(self: *App, name: []const u8) !void {
     return self.schedules.removeSchedule(name);
 }
