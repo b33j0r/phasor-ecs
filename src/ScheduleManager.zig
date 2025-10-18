@@ -184,6 +184,14 @@ pub fn removeSystem(self: *ScheduleManager, schedule_name: []const u8, comptime 
     try self.schedules.items[idx].remove(system_fn);
 }
 
+pub fn removeSystemObject(self: *ScheduleManager, schedule_name: []const u8, system: *root.System) !void {
+    const node = self.name_to_node.get(schedule_name) orelse return Error.ScheduleNotFound;
+    const id = self.graph.getNodeWeight(node);
+    const idx_u32 = self.id_to_index.get(id) orelse return Error.ScheduleNotFound;
+    const idx: usize = @intCast(idx_u32);
+    try self.schedules.items[idx].removeSystemObject(system);
+}
+
 pub const ScheduleIterator = struct {
     manager: *const ScheduleManager,
     topo: ScheduleGraph.TopologicalSortResult,

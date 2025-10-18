@@ -226,6 +226,34 @@ test "App removed systems are actually removed" {
     cleanupRecorder(&app);
 }
 
+test "App removeObject works for *System" {
+    const allocator = std.testing.allocator;
+    var app = try App.default(allocator);
+    defer app.deinit();
+
+    try app.insertResource(Recorder{});
+
+    const update_system = struct {
+        pub fn run(rec: ResMut(Recorder)) !void {
+            try rec.ptr.log.append(std.testing.allocator, "update");
+        }
+    }.run;
+
+    // Add the system
+    try app.addSystem("Update", update_system);
+
+    // Remove the system via removeSystemObject
+    var system_obj = try ecs.System.from(update_system);
+    try app.removeSystemObject("Update", &system_obj);
+
+    _ = try app.step();
+
+    const rec = app.world.getResource(Recorder).?;
+    try std.testing.expectEqual(@as(usize, 0), rec.log.items.len);
+
+    cleanupRecorder(&app);
+}
+
 test "App scoped commands" {
     const allocator = std.testing.allocator;
     var app = try App.default(allocator);

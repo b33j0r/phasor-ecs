@@ -66,6 +66,24 @@ pub fn remove(self: *Schedule, comptime system_fn: anytype) !void {
     _ = self.systems.swapRemove(idx);
 }
 
+/// Remove a system by reference to the System object itself
+pub fn removeSystemObject(self: *Schedule, system: *System) !void {
+    var found_idx: ?usize = null;
+    for (self.systems.items, 0..) |item, idx| {
+        if (item.run == system.run) {
+            found_idx = idx;
+            break;
+        }
+    }
+    const idx = found_idx orelse return;
+
+    // Unregister the system from the world
+    try system.unregister(self.world);
+
+    // Remove the system from the schedule
+    _ = self.systems.swapRemove(idx);
+}
+
 /// Run all systems in the schedule
 pub fn run(self: *const Schedule, world: *World) !void {
     for (self.systems.items) |system| {

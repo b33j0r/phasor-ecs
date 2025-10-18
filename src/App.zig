@@ -94,6 +94,9 @@ pub fn addSystem(self: *App, schedule_name: []const u8, comptime system_fn: anyt
 pub fn removeSystem(self: *App, schedule_name: []const u8, comptime system_fn: anytype) !void {
     try self.schedules.removeSystem(schedule_name, system_fn);
 }
+pub fn removeSystemObject(self: *App, schedule_name: []const u8, system: *System) !void {
+    try self.schedules.removeSystemObject(schedule_name, system);
+}
 pub fn scheduleBefore(self: *App, name: []const u8, other: []const u8) !void {
     try self.schedules.scheduleBefore(name, other);
 }
@@ -164,3 +167,4 @@ const ScheduleManager = root.ScheduleManager;
 const Schedule = root.Schedule;
 const World = root.World;
 const Events = root.Events;
+const System = root.System;
