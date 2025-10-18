@@ -176,6 +176,14 @@ pub fn addSystem(self: *ScheduleManager, schedule_name: []const u8, comptime sys
     try self.schedules.items[idx].add(system_fn);
 }
 
+pub fn getSystem(self: *ScheduleManager, schedule_name: []const u8, comptime system_fn: anytype) ?*root.System {
+    const node = self.name_to_node.get(schedule_name) orelse return null;
+    const id = self.graph.getNodeWeight(node);
+    const idx_u32 = self.id_to_index.get(id) orelse return null;
+    const idx: usize = @intCast(idx_u32);
+    return self.schedules.items[idx].getSystem(system_fn);
+}
+
 pub fn removeSystem(self: *ScheduleManager, schedule_name: []const u8, comptime system_fn: anytype) !void {
     const node = self.name_to_node.get(schedule_name) orelse return Error.ScheduleNotFound;
     const id = self.graph.getNodeWeight(node);

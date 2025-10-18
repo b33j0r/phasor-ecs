@@ -53,6 +53,12 @@ pub fn getSystemIndex(self: *const Schedule, comptime system_fn: anytype) ?usize
     return null;
 }
 
+/// Get a system by its function
+pub fn getSystem(self: *const Schedule, comptime system_fn: anytype) ?*System {
+    const idx = self.getSystemIndex(system_fn) orelse return null;
+    return &self.systems.items[idx];
+}
+
 /// Remove a system from the schedule and unregister it from the world
 pub fn remove(self: *Schedule, comptime system_fn: anytype) !void {
     const idx = self.getSystemIndex(system_fn) orelse return;

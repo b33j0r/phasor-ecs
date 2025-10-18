@@ -254,6 +254,21 @@ test "App removeObject works for *System" {
     cleanupRecorder(&app);
 }
 
+test "App getSystem returns a *System" {
+    const allocator = std.testing.allocator;
+    var app = try App.default(allocator);
+    defer app.deinit();
+
+    const update_system = struct {
+        pub fn run() !void {}
+    }.run;
+
+    try app.addSystem("Update", update_system);
+
+    const system = app.getSystem("Update", update_system) orelse unreachable;
+    _ = system; // Suppress unused variable warning
+}
+
 test "App scoped commands" {
     const allocator = std.testing.allocator;
     var app = try App.default(allocator);
