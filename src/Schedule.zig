@@ -53,6 +53,11 @@ pub fn getSystemIndex(self: *const Schedule, comptime system_fn: anytype) ?usize
     return null;
 }
 
+/// Get the number of systems in the schedule
+pub fn getSystemCount(self: *const Schedule) usize {
+    return self.systems.items.len;
+}
+
 /// Get a system by its function
 pub fn getSystem(self: *const Schedule, comptime system_fn: anytype) ?*System {
     const idx = self.getSystemIndex(system_fn) orelse return null;
