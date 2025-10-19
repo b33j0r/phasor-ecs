@@ -94,9 +94,34 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    // The phasor-phases module (depends on phasor-ecs)
+    const phasor_phases_mod = b.addModule("phasor-phases", .{
+        .root_source_file = b.path("lib/phasor-phases/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "phasor-ecs", .module = phasor_ecs_mod },
+        },
+    });
+
+    const phasor_phases_tests_mod = b.addModule("phasor_phases_tests", .{
+        .root_source_file = b.path("lib/phasor-phases/tests/tests.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "phasor-ecs", .module = phasor_ecs_mod },
+            .{ .name = "phasor-phases", .module = phasor_phases_mod },
+        },
+    });
+    const phasor_phases_tests = b.addTest(.{
+        .root_module = phasor_phases_tests_mod,
+    });
+    const run_phasor_phases_tests = b.addRunArtifact(phasor_phases_tests);
+
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_phasor_ecs_mod_tests.step);
     test_step.dependOn(&run_phasor_ecs_dir_tests.step);
     test_step.dependOn(&run_phasor_db_tests.step);
     test_step.dependOn(&run_phasor_graph_tests.step);
+    test_step.dependOn(&run_phasor_phases_tests.step);
 }
