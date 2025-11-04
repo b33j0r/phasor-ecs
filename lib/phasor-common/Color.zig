@@ -46,7 +46,7 @@ pub const MAGENTA = Color{ .r = 255, .g = 0, .b = 255, .a = 255 };
 // Specials
 pub const RAYWHITE = Color{ .r = 245, .g = 245, .b = 245, .a = 255 };
 pub const ORANGERED = Color{ .r = 230, .g = 97, .b = 0, .a = 255 };
-pub const BSOD = Color{ .r = 0, .g = 120, .b = 215, .a = 255 };
+pub const BSOD = Color{ .r = 0, .g = 0, .b = 215, .a = 255 };
 
 // ============================
 // Convenience constructors

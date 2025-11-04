@@ -46,7 +46,24 @@ pub const TargetFps = struct {
     value: i32,
 };
 
-pub const Vec2 = struct {
+pub const WindowResized = struct {
+    width: i32,
+    height: i32,
+};
+
+pub const ContentScale = struct {
+    x: f32 = 1.0,
+    y: f32 = 1.0,
+};
+
+pub const ContentScaleChanged = struct {
+    x: f32,
+    y: f32,
+};
+
+pub const Mat4 = @import("Mat4.zig");
+
+pub const Vec2 = extern struct {
     x: f32 = 0.0,
     y: f32 = 0.0,
 
@@ -95,7 +112,7 @@ pub const Vec2 = struct {
     }
 };
 
-pub const Vec3 = struct {
+pub const Vec3 = extern struct {
     x: f32 = 0.0,
     y: f32 = 0.0,
     z: f32 = 0.0,

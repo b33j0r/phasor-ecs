@@ -1,6 +1,12 @@
 //! Implements a thread-safe event broadcast system with multiple readers.
 //! Each EventReader maintains its own cursor into the event buffer.
-//! The queue blocks producers when full and drops events for slow readers.
+//!
+//! IMPORTANT: BroadcastChannel keeps events in memory until ALL readers consume them.
+//! This means if you have multiple EventReaders for the same event type, and some
+//! systems are inactive (e.g., different game states), you MUST drain events in ALL
+//! systems every frame to prevent unbounded memory growth. Use reader.drain() or
+//! a while loop with tryRecv() in systems that don't need to process events when
+//! inactive.
 
 const std = @import("std");
 const phasor_channel = @import("phasor-channel");
@@ -226,6 +232,12 @@ pub fn EventReader(comptime T: type) type {
             const events = world.getResource(Events(T)) orelse return; // If events gone, nothing to clean
             const key = Events(T).makeKey(system_fn);
             _ = events.remove(key);
+        }
+
+        /// Drain all pending events without processing them.
+        pub fn drain(self: Self) void {
+            if (self.receiver == null) return;
+            while (self.receiver.?.tryRecv()) |_| {}
         }
 
         pub fn recv(self: Self) !T {
