@@ -5,6 +5,8 @@ pub const Prng = PrngPlugin.Prng;
 pub const Bounds = @import("Bounds.zig");
 pub const Padding = @import("Padding.zig");
 pub const Color = @import("Color.zig");
+pub const Mat4 = @import("Mat4.zig");
+pub const Quat = @import("Quat.zig");
 
 pub const ClearColor = struct {
     color: Color = Color.BSOD,
@@ -60,8 +62,6 @@ pub const ContentScaleChanged = struct {
     x: f32,
     y: f32,
 };
-
-pub const Mat4 = @import("Mat4.zig");
 
 pub const Vec2 = extern struct {
     x: f32 = 0.0,

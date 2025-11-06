@@ -111,6 +111,28 @@ pub fn rotateY(angle: f32) Mat4 {
     };
 }
 
+/// Create a rotation matrix from a quaternion
+pub fn fromQuaternion(q: Quat) Mat4 {
+    const xx = q.x * q.x;
+    const yy = q.y * q.y;
+    const zz = q.z * q.z;
+    const xy = q.x * q.y;
+    const xz = q.x * q.z;
+    const yz = q.y * q.z;
+    const wx = q.w * q.x;
+    const wy = q.w * q.y;
+    const wz = q.w * q.z;
+
+    return .{
+        .m = .{
+            .{ 1.0 - 2.0 * (yy + zz), 2.0 * (xy + wz), 2.0 * (xz - wy), 0.0 },
+            .{ 2.0 * (xy - wz), 1.0 - 2.0 * (xx + zz), 2.0 * (yz + wx), 0.0 },
+            .{ 2.0 * (xz + wy), 2.0 * (yz - wx), 1.0 - 2.0 * (xx + yy), 0.0 },
+            .{ 0.0, 0.0, 0.0, 1.0 },
+        },
+    };
+}
+
 /// Multiply two matrices: result = a * b
 pub fn mul(a: Mat4, b: Mat4) Mat4 {
     var result: Mat4 = undefined;
@@ -177,3 +199,4 @@ pub fn orthographic2D(left: f32, right: f32, bottom: f32, top: f32) Mat4 {
 const std = @import("std");
 const Vec2 = @import("root.zig").Vec2;
 const Vec3 = @import("root.zig").Vec3;
+const Quat = @import("root.zig").Quat;

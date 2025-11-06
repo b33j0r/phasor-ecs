@@ -68,7 +68,7 @@ pub fn withAlphaUnit(self: Color, a_unit: f32) Color {
     return out;
 }
 
-pub const F32 = struct {
+pub const F32 = extern struct {
     r: f32,
     g: f32,
     b: f32,
