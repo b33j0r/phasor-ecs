@@ -650,7 +650,8 @@ test "Database addComponents with runtime values" {
     var db = Database.init(allocator);
     defer db.deinit();
 
-    const seed: u64 = @intCast(std.time.milliTimestamp());
+    const time = try std.posix.clock_gettime(std.posix.system.clockid_t.REALTIME);
+    const seed: u64 = @intCast(time.nsec);
     var prng = std.Random.DefaultPrng.init(seed);
     var random = prng.random();
 
@@ -1080,9 +1081,9 @@ test "Droppable deinit on swapRemove only drops removed index" {
     defer db.deinit();
 
     var c = OwnedCounter{ .count = 0 };
-    const e1 = try db.createEntity(.{ Droppable{ .counter = &c } });
-    const e2 = try db.createEntity(.{ Droppable{ .counter = &c } });
-    const e3 = try db.createEntity(.{ Droppable{ .counter = &c } });
+    const e1 = try db.createEntity(.{Droppable{ .counter = &c }});
+    const e2 = try db.createEntity(.{Droppable{ .counter = &c }});
+    const e3 = try db.createEntity(.{Droppable{ .counter = &c }});
 
     try db.removeEntity(e2);
     try testing.expectEqual(@as(usize, 1), c.count);

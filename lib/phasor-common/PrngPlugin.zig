@@ -3,9 +3,10 @@ seed: u64 = 1337,
 const PrngPlugin = @This();
 
 pub fn default() PrngPlugin {
-    const seed = std.time.milliTimestamp();
+    const time = try std.posix.clock_gettime(std.posix.system.clockid_t.REALTIME);
+    const seed: u64 = @intCast(time.nsec);
     return .{
-        .seed = @intCast(seed),
+        .seed = seed,
     };
 }
 
