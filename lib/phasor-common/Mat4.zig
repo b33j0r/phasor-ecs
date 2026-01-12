@@ -190,6 +190,21 @@ pub fn orthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far
     };
 }
 
+/// Create a perspective projection matrix
+/// Angle in radians
+pub fn perspective(fovy: f32, aspect: f32, near: f32, far: f32) Mat4 {
+    const f = 1.0 / @tan(fovy / 2.0);
+    const d = far - near;
+    return .{
+        .m = .{
+            .{ f / aspect, 0, 0, 0 },
+            .{ 0, f, 0, 0 },
+            .{ 0, 0, -(far + near) / d, -1 },
+            .{ 0, 0, -(2.0 * far * near) / d, 0 },
+        },
+    };
+}
+
 /// Create a 2D orthographic projection (near=-1, far=1)
 pub fn orthographic2D(left: f32, right: f32, bottom: f32, top: f32) Mat4 {
     return orthographic(left, right, bottom, top, -1.0, 1.0);

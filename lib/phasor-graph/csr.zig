@@ -239,7 +239,7 @@ pub fn Csr(comptime NodeWeight: type, comptime EdgeWeight: type) type {
             // Find insertion position
             const pos = self.findEdgePos(source, target) catch |err| switch (err) {
                 error.EdgeExists => return false,
-                else => return err,
+                // else => return err,
             };
 
             // Insert edge
