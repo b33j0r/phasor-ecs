@@ -17,15 +17,20 @@ pub fn Csr(comptime NodeWeight: type, comptime EdgeWeight: type) type {
 
         /// Column indices (target nodes for each edge)
         column: ArrayListUnmanaged(u32),
+
         /// Edge weights, parallel to column
         edges: OptionalArray(EdgeWeight),
+
         /// Row pointers - indices where each node's edges start
         /// Always node_count + 1 elements, last element equals column.len
         row: ArrayListUnmanaged(usize),
+
         /// Node weights
         node_weights: OptionalArray(NodeWeight),
+
         /// Total number of edges (for undirected graphs)
         edge_count: usize,
+
         /// Memory allocator
         allocator: Allocator,
 
@@ -43,9 +48,9 @@ pub fn Csr(comptime NodeWeight: type, comptime EdgeWeight: type) type {
         pub fn init(allocator: Allocator) Self {
             var self = Self{
                 .column = .empty,
-                .edges = if (@sizeOf(EdgeWeight) == 0) OptionalArray(EdgeWeight).init() else .empty,
+                .edges = initOptionalArray(EdgeWeight),
                 .row = .empty,
-                .node_weights = if (@sizeOf(NodeWeight) == 0) OptionalArray(NodeWeight).init() else .empty,
+                .node_weights = initOptionalArray(NodeWeight),
                 .edge_count = 0,
                 .allocator = allocator,
             };
@@ -58,25 +63,21 @@ pub fn Csr(comptime NodeWeight: type, comptime EdgeWeight: type) type {
         pub fn withNodes(allocator: Allocator, n: usize) !Self {
             var self = Self{
                 .column = .empty,
-                .edges = if (@sizeOf(EdgeWeight) == 0) OptionalArray(EdgeWeight).init() else .empty,
+                .edges = initOptionalArray(EdgeWeight),
                 .row = .empty,
-                .node_weights = if (@sizeOf(NodeWeight) == 0) OptionalArray(NodeWeight).init() else .empty,
+                .node_weights = initOptionalArray(NodeWeight),
                 .edge_count = 0,
                 .allocator = allocator,
             };
 
             // Initialize row pointers (all pointing to 0 initially)
-            try self.row.ensureTotalCapacity(self.allocator, n + 1);
-            for (0..n + 1) |_| {
-                try self.row.append(allocator, 0);
-            }
+            try self.row.resize(self.allocator, n + 1);
+            @memset(self.row.items, 0);
 
             // Initialize node weights with default values
             try self.node_weights.ensureTotalCapacity(self.allocator, n);
-            for (0..n) |_| {
-                const default_weight = if (@sizeOf(NodeWeight) == 0) {} else std.mem.zeroes(NodeWeight);
-                try self.node_weights.append(self.allocator, default_weight);
-            }
+            const default_weight = if (@sizeOf(NodeWeight) == 0) {} else std.mem.zeroes(NodeWeight);
+            try self.node_weights.appendNTimes(self.allocator, default_weight, n);
 
             return self;
         }
@@ -165,9 +166,9 @@ pub fn Csr(comptime NodeWeight: type, comptime EdgeWeight: type) type {
 
             // Build new CSR arrays excluding the removed node and incident edges
             var new_column: ArrayListUnmanaged(u32) = .empty;
-            var new_edges: OptionalArray(EdgeWeight) = if (@sizeOf(EdgeWeight) == 0) OptionalArray(EdgeWeight).init() else .empty;
+            var new_edges: OptionalArray(EdgeWeight) = initOptionalArray(EdgeWeight);
             var new_row: ArrayListUnmanaged(usize) = .empty;
-            var new_node_weights: OptionalArray(NodeWeight) = if (@sizeOf(NodeWeight) == 0) OptionalArray(NodeWeight).init() else .empty;
+            var new_node_weights: OptionalArray(NodeWeight) = initOptionalArray(NodeWeight);
 
             // Reserve reasonable capacities
             try new_row.ensureTotalCapacity(self.allocator, n);
@@ -259,7 +260,6 @@ pub fn Csr(comptime NodeWeight: type, comptime EdgeWeight: type) type {
         pub fn containsEdge(self: *const Self, source: NodeIndex, target: NodeIndex) bool {
             _ = self.findEdgePos(source, target) catch |err| switch (err) {
                 error.EdgeExists => return true,
-                else => return false,
             };
             return false;
         }
@@ -351,6 +351,11 @@ pub fn Csr(comptime NodeWeight: type, comptime EdgeWeight: type) type {
             }
         }
     };
+}
+
+/// Helper function to initialize OptionalArray based on type size
+inline fn initOptionalArray(comptime T: type) OptionalArray(T) {
+    return if (@sizeOf(T) == 0) OptionalArray(T).init() else .empty;
 }
 
 /// Helper container that handles zero-sized types like `void` and `struct {}`.
