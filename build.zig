@@ -27,23 +27,8 @@ pub fn build(b: *std.Build) void {
     const run_phasor_db_tests = b.addRunArtifact(phasor_db_tests);
 
     // Add phasor-graph as a local module
-    const phasor_graph_mod = b.addModule("phasor-graph", .{
-        .root_source_file = b.path("lib/phasor-graph/root.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    const phasor_graph_tests_mod = b.addModule("phasor_graph_tests", .{
-        .root_source_file = b.path("lib/phasor-graph/tests/tests.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "phasor-graph", .module = phasor_graph_mod },
-        },
-    });
-    const phasor_graph_tests = b.addTest(.{
-        .root_module = phasor_graph_tests_mod,
-    });
-    const run_phasor_graph_tests = b.addRunArtifact(phasor_graph_tests);
+    const phasor_graph_dep = b.dependency("phasor_graph", .{});
+    const phasor_graph_mod = phasor_graph_dep.module("phasor-graph");
 
     // Add phasor-channel as a local module
     const phasor_channel_dep = b.dependency("phasor_channel", .{});
@@ -122,6 +107,5 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_phasor_ecs_mod_tests.step);
     test_step.dependOn(&run_phasor_ecs_dir_tests.step);
     test_step.dependOn(&run_phasor_db_tests.step);
-    test_step.dependOn(&run_phasor_graph_tests.step);
     test_step.dependOn(&run_phasor_phases_tests.step);
 }

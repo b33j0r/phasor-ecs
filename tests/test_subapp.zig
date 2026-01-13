@@ -27,16 +27,16 @@ test "SubApp: main -> echo -> main" {
 
     const ChildAppSystems = struct {
         pub fn startup() !void {
-            std.debug.print("ChildApp: Startup\n", .{});
+            std.log.info("ChildApp: Startup", .{});
         }
         pub fn shutdown() !void {
-            std.debug.print("ChildApp: Shutdown\n", .{});
+            std.log.info("ChildApp: Shutdown", .{});
         }
         pub fn echo(inbox: InboxReceiver, outbox: OutboxSender) !void {
             while (try inbox.tryRecv()) |msg| {
                 switch (msg) {
                     .echo => |value| {
-                        std.debug.print("ChildApp: Received echo {d}\n", .{value});
+                        std.log.info("ChildApp: Received echo {d}", .{value});
                         try outbox.send(.{ .echoed = value });
                     },
                 }
@@ -46,20 +46,20 @@ test "SubApp: main -> echo -> main" {
 
     const MainAppSystems = struct {
         pub fn startup() !void {
-            std.debug.print("MainApp: Startup\n", .{});
+            std.log.info("MainApp: Startup", .{});
         }
         pub fn shutdown() !void {
-            std.debug.print("MainApp: Shutdown\n", .{});
+            std.log.info("MainApp: Shutdown", .{});
         }
         pub fn send_echo(inbox: InboxSender) !void {
             try inbox.send(.{ .echo = 42 });
-            std.debug.print("MainApp: Sent echo 42\n", .{});
+            std.log.info("MainApp: Sent echo 42", .{});
         }
         pub fn receive_echo(commands: *Commands, outbox: OutboxReceiver) !void {
             while (try outbox.tryRecv()) |msg| {
                 switch (msg) {
                     .echoed => |value| {
-                        std.debug.print("MainApp: Received echoed {d}\n", .{value});
+                        std.log.info("MainApp: Received echoed {d}", .{value});
                         try std.testing.expect(value == 42);
                         // Exit after receiving the echoed message
                         try commands.insertResource(App.Exit{ .code = @intCast(value) });

@@ -128,29 +128,27 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
             const th = try std.Thread.spawn(.{}, Self.subAppThread, .{&self.app});
             self.thread = th;
 
-            // Wait for child to signal it’s started
-            while (true) {
-                if (self.handle.status_rx.tryRecv()) |status| {
-                    switch (status) {
-                        .Started => return,
-                        .Stopped => return error.FailedToStart,
-                    }
-                }
-                try std.Thread.yield();
+            // Wait for child to signal it's started
+            const status = self.handle.status_rx.recv() catch return error.ChildStartFailed;
+            switch (status) {
+                .Started => return,
+                .Stopped => return error.FailedToStart,
             }
         }
 
         fn stop(self: *Self) !void {
             if (self.thread) |th| {
-                // Ask child to stop; then join.
-                try self.handle.ctrl_tx.send(.Stop);
+                // Check if the thread is still running and check if it already stopped.
+                // Try to send Stop in case it wasn't sent
+                _ = self.handle.ctrl_tx.send(.Stop) catch {};
 
-                // Wait for child to signal it’s stopped
-                while (true) {
-                    if (self.handle.status_rx.tryRecv()) |status| {
-                        if (status == .Stopped) break;
-                    }
-                    try std.Thread.yield();
+                // If stopSubApp system already ran, it already waited for .Stopped.
+                // If it didn't run (e.g. app crashed), we might need to wait here.
+                // However, joining the thread is the ultimate blocking synchronization.
+                // We only recv if we see a message waiting, to avoid double-consuming
+                // or blocking if already consumed.
+                if (self.handle.status_rx.tryRecv()) |status| {
+                    if (status != .Stopped) return error.UnexpectedStatus;
                 }
 
                 th.join();
@@ -168,10 +166,24 @@ pub fn SubApp(comptime InboxT: type, comptime OutboxT: type) type {
 
                 // Start the child thread right away
                 try self.subapp.start();
+
+                // Add shutdown system to PreShutdown so children shut down before parent
+                try app.addSystem("PreShutdown", stopSubApp);
+            }
+
+            fn stopSubApp(commands: *Commands) !void {
+                const handle = commands.getResource(Handle) orelse return;
+                // Send stop signal
+                try handle.ctrl_tx.send(.Stop);
+
+                // Wait for child to signal it's stopped.
+                // This ensures ChildApp: Shutdown happens before MainApp: Shutdown.
+                const status = handle.status_rx.recv() catch return error.ChildStopFailed;
+                if (status != .Stopped) return error.UnexpectedStatus;
             }
 
             pub fn cleanup(self: *Plugin, _: *App) !void {
-                // Stop child
+                // Ensure the child is stopped and thread joined
                 try self.subapp.stop();
             }
         };

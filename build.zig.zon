@@ -36,6 +36,10 @@
             .url = "git+https://github.com/b33j0r/phasor-channel#a9c6df65e9ce58a9b4aa94aa46d5baf81e9c6f91",
             .hash = "phasor_channel-0.0.1-mvQt8f-IAADnJJ43hZ0jZxtotfdDNPsJV52Y-vBCATuh",
         },
+        .phasor_graph = .{
+            .url = "git+https://github.com/b33j0r/phasor-graph?ref=main#5ec1f75254dc6637724518774229eea4740567eb",
+            .hash = "phasor_graph-0.0.0-9nmJXIhHAQCw71RM7IXq21eTveQ0HaBx36lDKfay7v66",
+        },
     },
     .paths = .{
         "build.zig",
