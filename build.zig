@@ -4,33 +4,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Add phasor-db as a lib module
-    const phasor_db_mod = b.addModule(
-        "phasor-db",
-        .{
-            .root_source_file = b.path("lib/phasor-db/root.zig"),
-            .target = target,
-            .optimize = optimize,
-        },
-    );
-    const phasor_db_tests_mod = b.addModule("phasor_db_tests", .{
-        .root_source_file = b.path("lib/phasor-db/tests/tests.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "phasor-db", .module = phasor_db_mod },
-        },
-    });
-    const phasor_db_tests = b.addTest(.{
-        .root_module = phasor_db_tests_mod,
-    });
-    const run_phasor_db_tests = b.addRunArtifact(phasor_db_tests);
+    // Add phasor-db as a dependency module
+    const phasor_db_dep = b.dependency("phasor_db", .{});
+    const phasor_db_mod = phasor_db_dep.module("phasor-db");
 
-    // Add phasor-graph as a local module
+    // Add phasor-graph as a dependency module
     const phasor_graph_dep = b.dependency("phasor_graph", .{});
     const phasor_graph_mod = phasor_graph_dep.module("phasor-graph");
 
-    // Add phasor-channel as a local module
+    // Add phasor-channel as a dependency module
     const phasor_channel_dep = b.dependency("phasor_channel", .{});
     const phasor_channel_mod = phasor_channel_dep.module("phasor-channel");
 
@@ -106,6 +88,5 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_phasor_ecs_mod_tests.step);
     test_step.dependOn(&run_phasor_ecs_dir_tests.step);
-    test_step.dependOn(&run_phasor_db_tests.step);
     test_step.dependOn(&run_phasor_phases_tests.step);
 }

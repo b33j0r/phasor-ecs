@@ -40,6 +40,10 @@
             .url = "git+https://github.com/b33j0r/phasor-graph?ref=main#5ec1f75254dc6637724518774229eea4740567eb",
             .hash = "phasor_graph-0.0.0-9nmJXIhHAQCw71RM7IXq21eTveQ0HaBx36lDKfay7v66",
         },
+        .phasor_db = .{
+            .url = "git+https://github.com/b33j0r/phasor-db?ref=main#c860410d6c04db12d6bc0a665ed76d120e402ed5",
+            .hash = "phasor_db-0.2.0-bJGmGMdjAQBbM444GoFgM6J5dKv9lOUxwGG_b3VzVrqI",
+        },
     },
     .paths = .{
         "build.zig",
