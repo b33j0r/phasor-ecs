@@ -106,3 +106,23 @@ pub const Vec3 = extern struct {
         return .{ .x = v.x, .y = v.y, .z = z };
     }
 };
+
+test "Vec2 basic" {
+    const v1 = Vec2{ .x = 1, .y = 2 };
+    const v2 = Vec2{ .x = 3, .y = 4 };
+    const v3 = v1.add(v2);
+    try std.testing.expectEqual(@as(f32, 4.0), v3.x);
+    try std.testing.expectEqual(@as(f32, 6.0), v3.y);
+
+    const len = v1.length();
+    try std.testing.expectApproxEqAbs(@as(f32, @sqrt(5.0)), len, 1e-6);
+}
+
+test "Vec3 basic" {
+    const v1 = Vec3{ .x = 1, .y = 0, .z = 0 };
+    const v2 = Vec3{ .x = 0, .y = 1, .z = 0 };
+    const v3 = v1.cross(v2);
+    try std.testing.expectEqual(@as(f32, 0.0), v3.x);
+    try std.testing.expectEqual(@as(f32, 0.0), v3.y);
+    try std.testing.expectEqual(@as(f32, 1.0), v3.z);
+}

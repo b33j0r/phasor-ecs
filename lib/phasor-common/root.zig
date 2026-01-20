@@ -5,8 +5,8 @@ pub const Prng = PrngPlugin.Prng;
 pub const Bounds = @import("Bounds.zig");
 pub const Padding = @import("Padding.zig");
 pub const Color = @import("Color.zig");
-pub const Mat4 = @import("Mat4.zig");
-pub const Quat = @import("Quat.zig");
+pub const Mat4 = @import("mat4.zig").Mat4;
+pub const Quat = @import("quat.zig").Quat;
 pub const vec = @import("vec.zig");
 pub const Vec2 = vec.Vec2;
 pub const Vec3 = vec.Vec3;
@@ -23,11 +23,9 @@ pub const ElapsedTime = struct {
     seconds: f32,
 };
 
-pub const Transform2d = struct {
-    translation: Vec2 = .{ .x = 0.0, .y = 0.0 },
-    scale: Vec2 = .{ .x = 1.0, .y = 1.0 },
-    rotation: f32 = 0.0, // radians
-};
+pub const transform = @import("transform.zig");
+pub const Transform2d = transform.Transform2d;
+pub const Transform3d = transform.Transform3d;
 
 pub const RenderBounds = struct {
     width: f32,
@@ -66,5 +64,13 @@ pub const ContentScaleChanged = struct {
     y: f32,
 };
 
-
-
+test {
+    _ = @import("Bounds.zig");
+    _ = @import("Color.zig");
+    _ = @import("mat4.zig");
+    _ = @import("Padding.zig");
+    _ = @import("PrngPlugin.zig");
+    _ = @import("quat.zig");
+    _ = @import("transform.zig");
+    _ = @import("vec.zig");
+}

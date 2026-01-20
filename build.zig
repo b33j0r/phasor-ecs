@@ -52,7 +52,7 @@ pub fn build(b: *std.Build) void {
     const run_phasor_ecs_dir_tests = b.addRunArtifact(phasor_ecs_dir_tests);
 
     // The phasor-common module (depends on phasor-ecs)
-    _ = b.addModule("phasor-common", .{
+    const phasor_common_mod = b.addModule("phasor-common", .{
         .root_source_file = b.path("lib/phasor-common/root.zig"),
         .target = target,
         .optimize = optimize,
@@ -60,6 +60,11 @@ pub fn build(b: *std.Build) void {
             .{ .name = "phasor-ecs", .module = phasor_ecs_mod },
         },
     });
+
+    const phasor_common_tests = b.addTest(.{
+        .root_module = phasor_common_mod,
+    });
+    const run_phasor_common_tests = b.addRunArtifact(phasor_common_tests);
 
     // The phasor-phases module (depends on phasor-ecs)
     const phasor_phases_mod = b.addModule("phasor-phases", .{
@@ -89,4 +94,5 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_phasor_ecs_mod_tests.step);
     test_step.dependOn(&run_phasor_ecs_dir_tests.step);
     test_step.dependOn(&run_phasor_phases_tests.step);
+    test_step.dependOn(&run_phasor_common_tests.step);
 }
