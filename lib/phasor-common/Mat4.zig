@@ -175,7 +175,7 @@ pub fn rotate2DPoint(x: f32, y: f32, angle: f32) struct { x: f32, y: f32 } {
 }
 
 /// Create an orthographic projection matrix
-/// Maps the box [left, right] x [bottom, top] x [near, far] to clip space [-1, 1]³
+/// Maps the box [left, right] x [bottom, top] x [near, far] to WebGPU clip space [0, 1] for Z
 pub fn orthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) Mat4 {
     const w = right - left;
     const h = top - bottom;
@@ -184,13 +184,14 @@ pub fn orthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far
         .m = .{
             .{ 2.0 / w, 0, 0, 0 },
             .{ 0, 2.0 / h, 0, 0 },
-            .{ 0, 0, -2.0 / d, 0 },
-            .{ -(right + left) / w, -(top + bottom) / h, -(far + near) / d, 1 },
+            .{ 0, 0, -1.0 / d, 0 },
+            .{ -(right + left) / w, -(top + bottom) / h, -near / d, 1 },
         },
     };
 }
 
 /// Create a perspective projection matrix
+/// Maps Z to WebGPU clip space [0, 1]
 /// Angle in radians
 pub fn perspective(fovy: f32, aspect: f32, near: f32, far: f32) Mat4 {
     const f = 1.0 / @tan(fovy / 2.0);
@@ -199,8 +200,8 @@ pub fn perspective(fovy: f32, aspect: f32, near: f32, far: f32) Mat4 {
         .m = .{
             .{ f / aspect, 0, 0, 0 },
             .{ 0, f, 0, 0 },
-            .{ 0, 0, -(far + near) / d, -1 },
-            .{ 0, 0, -(2.0 * far * near) / d, 0 },
+            .{ 0, 0, -far / d, -1 },
+            .{ 0, 0, -(far * near) / d, 0 },
         },
     };
 }

@@ -252,7 +252,7 @@ pub fn EventReader(comptime T: type) type {
 
         pub fn next(self: Self) ?T {
             if (self.receiver == null) return null;
-            return self.receiver.?.next();
+            return self.receiver.?.tryRecv();
         }
     };
 }
